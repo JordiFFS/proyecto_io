@@ -12,6 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from models.programacion_lineal.simplex import Simplex
 from ia.analisis_sensibilidad import AnalisisSensibilidad
 from empresa.caso_empresarial import CasoEmpresarial
+from models.transporte.costo_minimo import CostoMinimo
+from models.transporte.esquina_noroeste import EsquinaNoreste
 
 # Configuración de la página
 st.set_page_config(
@@ -380,8 +382,127 @@ elif menu_principal == "📈 Programación Lineal":
 # ============================================
 elif menu_principal == "🚚 Problemas de Transporte":
     st.markdown("<h2 class='section-header'>Problemas de Transporte</h2>", unsafe_allow_html=True)
-    st.info("🔧 Esta sección está en desarrollo")
+    st.write("Calcula la distribución óptima de recursos para minimizar costos.")
 
+    # 1. Configuración de dimensiones
+    col1, col2 = st.columns(2)
+    with col1:
+        n_origenes = st.number_input("🏭 Número de Orígenes (Oferta)", min_value=2, value=3, step=1, key="num_origenes_input")
+    with col2:
+        n_destinos = st.number_input("🏪 Número de Destinos (Demanda)", min_value=2, value=4, step=1, key="num_destinos_input")
+
+    st.divider()
+
+    # --- LÓGICA DE MEMORIA (PERSISTENCIA) ---
+    # Creamos un identificador único basado en el tamaño de la tabla
+    dims_actuales = f"{n_origenes}_{n_destinos}"
+
+    # Si cambiamos el tamaño de la tabla, reiniciamos los datos.
+    # Si NO cambiamos el tamaño, mantenemos los datos que escribiste.
+    if 'transporte_dims' not in st.session_state or st.session_state.transporte_dims != dims_actuales:
+        st.session_state.transporte_dims = dims_actuales
+        
+        # Inicializamos con ceros (más limpio para escribir) o aleatorios si prefieres
+        st.session_state.df_costos_memoria = pd.DataFrame(
+            np.zeros((n_origenes, n_destinos)), # Inicia en ceros
+            columns=[f"Destino {i+1}" for i in range(n_destinos)],
+            index=[f"Origen {i+1}" for i in range(n_origenes)]
+        )
+        st.session_state.df_oferta_memoria = pd.DataFrame(
+            np.zeros((n_origenes, 1)),
+            index=[f"Origen {i+1}" for i in range(n_origenes)],
+            columns=["Unidades"]
+        )
+        st.session_state.df_demanda_memoria = pd.DataFrame(
+            np.zeros((n_destinos, 1)),
+            index=[f"Destino {i+1}" for i in range(n_destinos)],
+            columns=["Unidades"]
+        )
+
+    # 2. Entrada de Datos (Usando la memoria)
+    st.subheader("1. Ingrese la Matriz de Costos Unitarios ($)")
+    
+    # IMPORTANTE: Guardamos lo que editas de vuelta en la memoria
+    matriz_costos = st.data_editor(
+        st.session_state.df_costos_memoria, 
+        key="editor_costos", 
+        use_container_width=True
+    )
+    st.session_state.df_costos_memoria = matriz_costos # Actualizar memoria
+
+    col3, col4 = st.columns(2)
+    with col3:
+        st.subheader("2. Oferta Disponible")
+        oferta_input = st.data_editor(
+            st.session_state.df_oferta_memoria, 
+            key="editor_oferta", 
+            use_container_width=True
+        )
+        st.session_state.df_oferta_memoria = oferta_input # Actualizar memoria
+
+    with col4:
+        st.subheader("3. Demanda Requerida")
+        demanda_input = st.data_editor(
+            st.session_state.df_demanda_memoria, 
+            key="editor_demanda", 
+            use_container_width=True
+        )
+        st.session_state.df_demanda_memoria = demanda_input # Actualizar memoria
+
+    st.divider()
+
+    # 3. Selección del Método y Resolución
+    metodo = st.selectbox("🎯 Seleccione el Método de Resolución", 
+                         ["Esquina Noroeste", "Costo Mínimo"])
+
+    if st.button("🚀 Resolver Problema de Transporte", type="primary"):
+        # Convertir datos de Pandas a listas simples
+        costos_lista = matriz_costos.values.tolist()
+        oferta_lista = oferta_input["Unidades"].tolist()
+        demanda_lista = demanda_input["Unidades"].tolist()
+
+        # Validar equilibrio
+        total_oferta = sum(oferta_lista)
+        total_demanda = sum(demanda_lista)
+        
+        st.info(f"📊 Resumen: Oferta Total = {total_oferta} | Demanda Total = {total_demanda}")
+
+        try:
+            resultado = None
+            
+            # --- LÓGICA DE TUS ALGORITMOS ---
+            if metodo == "Esquina Noroeste":
+                modelo = EsquinaNoreste(costos_lista, oferta_lista, demanda_lista)
+                resultado = modelo.resolver()
+            
+            elif metodo == "Costo Mínimo":
+                modelo = CostoMinimo(costos_lista, oferta_lista, demanda_lista)
+                resultado = modelo.resolver()
+
+            # --- MOSTRAR RESULTADOS ---
+            if resultado:
+                st.success(f"✅ ¡Solución Encontrada! Costo Total: ${resultado['costo_total']}")
+                
+                st.subheader("📦 Matriz de Asignación (Envíos Óptimos)")
+                
+                df_resultado = pd.DataFrame(
+                    resultado['asignacion'],
+                    columns=[f"Destino {i+1}" for i in range(n_destinos)],
+                    index=[f"Origen {i+1}" for i in range(n_origenes)]
+                )
+                st.dataframe(df_resultado, use_container_width=True)
+                
+                # Guardar en historial
+                st.session_state.historial.append({
+                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'tipo': 'Transporte',
+                    'metodo': metodo,
+                    'z_optimo': float(resultado['costo_total']),
+                    'iteraciones': 'N/A'
+                })
+
+        except Exception as e:
+            st.error(f"❌ Ocurrió un error en el cálculo: {e}")
 # ============================================
 # SECCIÓN: PROBLEMAS DE REDES
 # ============================================
