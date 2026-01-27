@@ -492,6 +492,56 @@ elif menu_principal == "🚚 Problemas de Transporte":
                 )
                 st.dataframe(df_resultado, use_container_width=True)
                 
+                # ------------------------------------------------------------------
+                # NUEVO: REPORTE DETALLADO PARA EL PROFESOR
+                # ------------------------------------------------------------------
+                with st.expander("🔎 Ver Desglose de Cálculos (Paso a Paso)", expanded=True):
+                    st.markdown("### 📝 Detalle de la Función Objetivo")
+                    
+                    calculos_texto = []
+                    variables_basicas = 0
+                    
+                    # Recorremos la matriz para explicar cada costo
+                    for i in range(n_origenes):
+                        for j in range(n_destinos):
+                            cantidad = resultado['asignacion'][i][j]
+                            if cantidad > 0:
+                                costo_unitario = costos_lista[i][j]
+                                subtotal = cantidad * costo_unitario
+                                calculos_texto.append(
+                                    f"• **Origen {i+1} → Destino {j+1}**: "
+                                    f"{cantidad} uds × ${costo_unitario} = **${subtotal}**"
+                                )
+                                variables_basicas += 1
+                    
+                    # Mostrar las multiplicaciones
+                    for linea in calculos_texto:
+                        st.write(linea)
+                    
+                    st.divider()
+                    
+                    # Verificación teórica (Degeneración)
+                    st.markdown("### 📐 Verificación de Propiedades")
+                    col_a, col_b = st.columns(2)
+                    
+                    m = n_origenes
+                    n = n_destinos
+                    esperadas = m + n - 1
+                    
+                    with col_a:
+                        st.metric("Variables Básicas (Asignaciones)", variables_basicas)
+                    with col_b:
+                        st.metric("Esperadas (m + n - 1)", esperadas)
+                    
+                    if variables_basicas < esperadas:
+                        st.warning(f"⚠️ **Solución Degenerada**: El número de asignaciones ({variables_basicas}) es menor a m+n-1 ({esperadas}). Esto es normal en ciertos problemas, pero importante notar para optimización futura (Stepping Stone/MODI).")
+                    else:
+                        st.success("✅ **Solución No Degenerada**: Cumple con la condición m+n-1.")
+
+                # ------------------------------------------------------------------
+
+
+
                 # Guardar en historial
                 st.session_state.historial.append({
                     'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
