@@ -12,6 +12,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from models.programacion_lineal.simplex import Simplex
 from ia.analisis_sensibilidad import AnalisisSensibilidad
 from empresa.caso_empresarial import CasoEmpresarial
+# Redes
+from models.redes.red import Red
+from models.redes.ruta_corta import RutaMasCorta
+from models.redes.adaptadores import red_a_matriz_distancias
+
 
 # Configuración de la página
 st.set_page_config(
@@ -376,18 +381,152 @@ elif menu_principal == "📈 Programación Lineal":
                 st.error(f"Error: {resultado.get('mensaje')}")
 
 # ============================================
-# SECCIÓN: PROBLEMAS DE TRANSPORTE
-# ============================================
-elif menu_principal == "🚚 Problemas de Transporte":
-    st.markdown("<h2 class='section-header'>Problemas de Transporte</h2>", unsafe_allow_html=True)
-    st.info("🔧 Esta sección está en desarrollo")
-
-# ============================================
 # SECCIÓN: PROBLEMAS DE REDES
 # ============================================
 elif menu_principal == "🌐 Problemas de Redes":
     st.markdown("<h2 class='section-header'>Problemas de Redes</h2>", unsafe_allow_html=True)
-    st.info("🔧 Esta sección está en desarrollo")
+
+    from models.redes.red import Red
+    from models.redes.ruta_corta import RutaMasCorta
+    from models.redes.adaptadores import red_a_matriz_distancias
+    import pandas as pd
+    import math
+
+    st.subheader("Configuración del Problema")
+
+    nodos_input = st.text_input("Nodos (ej: A,B,C,D)", value="A,B,C,D")
+    nodos = [n.strip() for n in nodos_input.split(",") if n.strip()]
+    if len(nodos) < 2:
+        st.warning("Ingrese al menos 2 nodos")
+        st.stop()
+
+    num_arcos = st.number_input("Número de arcos", min_value=1, value=4)
+
+    arcos = []
+    for i in range(num_arcos):
+        st.markdown(f"**Arco {i+1}**")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            o = st.selectbox("Origen", nodos, key=f"o{i}")
+        with c2:
+            d = st.selectbox("Destino", nodos, key=f"d{i}")
+        with c3:
+            c = st.number_input("Costo", value=1.0, key=f"c{i}")
+        arcos.append((o, d, c))
+
+    origen = st.selectbox("Nodo origen", nodos)
+
+    if st.button("🚀 Resolver"):
+        red = Red(nodos)
+        for o, d, c in arcos:
+            red.agregar_arco(o, d, costo=c)
+
+        matriz, nodos_orden = red_a_matriz_distancias(red)
+        idx_origen = nodos_orden.index(origen)
+
+        solver = RutaMasCorta(matriz, nodos_orden)
+        resultado = solver.resolver(idx_origen)
+
+        # -------- ESTADO INICIAL --------
+        st.subheader("Estado inicial del algoritmo")
+        df_init = pd.DataFrame({
+            "Nodo": nodos_orden,
+            "Distancia inicial": ["0" if n == origen else "∞" for n in nodos_orden],
+            "Predecesor": ["—"] * len(nodos_orden)
+        })
+        st.dataframe(df_init, width="stretch")
+
+        # -------- ITERACIONES + CUENTAS --------
+        st.subheader("Proceso paso a paso (Iteraciones de Dijkstra)")
+
+        for i, it in enumerate(solver.iteraciones):
+            st.markdown(f"### Iteración {i+1}")
+            st.write("Nodo fijado:", it["nodo_fijado"] if it["nodo_fijado"] else "—")
+
+            # 🔧 FIX 1: TODO A STRING (Arrow)
+            df_it = pd.DataFrame({
+                "Nodo": list(it["distancias"].keys()),
+                "Distancia": [str(x) for x in it["distancias"].values()],
+                "Predecesor": [
+                    it["predecesores"][n] if it["predecesores"][n] else "—"
+                    for n in it["distancias"].keys()
+                ]
+            })
+            st.dataframe(df_it, width="stretch")
+
+            # >>> CUENTAS DINÁMICAS <<<
+            if it["relajaciones"]:
+                st.markdown("**Relajaciones realizadas:**")
+                for r in it["relajaciones"]:
+                    antes = r["antes"] if r["antes"] != math.inf else "∞"
+                    tag = " → mejora" if r["mejora"] else ""
+                    st.write(
+                        f"{r['desde']} → {r['hacia']}: "
+                        f"{r['dist_u']} + {r['costo']} = {r['nueva']} "
+                        f"(antes {antes}){tag}"
+                    )
+
+        # -------- ÁRBOL --------
+        st.subheader("Árbol de Rutas Mínimas")
+
+        def imprimir_arbol(predecesores, origen):
+            hijos = {}
+            for n, p in predecesores.items():
+                if p:
+                    hijos.setdefault(p, []).append(n)
+
+            def dfs(nodo, nivel=0):
+                pref = ("│   " * (nivel - 1) + "└── ") if nivel > 0 else ""
+                txt = pref + f"{nodo}\n"
+                for h in hijos.get(nodo, []):
+                    txt += dfs(h, nivel + 1)
+                return txt
+
+            return dfs(origen)
+
+        st.code(imprimir_arbol(resultado["predecesores"], origen))
+
+        # -------- RESULTADO FINAL --------
+        st.subheader("Resultado Final")
+
+        df = pd.DataFrame(resultado["rutas"])
+        # 🔧 FIX 2: DISTANCIA A STRING (Arrow)
+        df["distancia"] = df["distancia"].astype(str)
+        st.dataframe(df, width="stretch")
+
+        # -------- DESGLOSE DE COSTOS POR RUTA --------
+        st.subheader("Desglose del costo por ruta")
+
+        idx = {n: i for i, n in enumerate(nodos_orden)}
+
+        for r in resultado["rutas"]:
+            destino = r["destino"]
+            ruta_str = r["ruta"]
+
+            st.markdown(f"**Destino: {destino}**")
+            st.write(f"Ruta: {ruta_str}")
+
+            nodos_ruta = [x.strip() for x in ruta_str.split("→")]
+
+            costos = []
+            for i in range(len(nodos_ruta) - 1):
+                u = nodos_ruta[i]
+                v = nodos_ruta[i + 1]
+                costo = matriz[idx[u]][idx[v]]
+                costos.append(costo)
+                st.write(f"{u} → {v} = {costo}")
+
+            if costos:
+                suma = " + ".join(str(c) for c in costos)
+                total = sum(costos)
+                st.write(f"**Total = {suma} = {total}**")
+            else:
+                st.write("**Total = 0**")
+
+            st.divider()
+
+
+
 
 # ============================================
 # SECCIÓN: GESTIÓN DE INVENTARIOS

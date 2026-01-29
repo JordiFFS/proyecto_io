@@ -1,211 +1,105 @@
-import numpy as np
-import pandas as pd
-from typing import Dict, List, Tuple
 import heapq
-
+import math
 
 class RutaMasCorta:
-    """
-    Implementación del algoritmo de Dijkstra para encontrar la ruta más corta
-    en una red desde un nodo origen a todos los demás nodos.
-    """
+    def __init__(self, matriz_distancias, nodos):
+        self.matriz = matriz_distancias
+        self.nodos = nodos
+        self.n = len(nodos)
 
-    def __init__(self, matriz_distancias: List[List[float]],
-                 nodos: List[str] = None):
-        """
-        Parámetros:
-        - matriz_distancias: matriz de adyacencia con distancias
-                            (usar np.inf para aristas no existentes)
-        - nodos: nombres de los nodos (opcional)
-        """
-        self.matriz_distancias = np.array(matriz_distancias, dtype=float)
-        self.n = len(self.matriz_distancias)
-        self.nodos = nodos or [f"N{i + 1}" for i in range(self.n)]
+        self.dist = [math.inf] * self.n
+        self.pred = [-1] * self.n
+        self.visitados = set()
 
-        # Crear lista de adyacencia
-        self.adyacencia = self._construir_adyacencia()
+        # HISTORIAL PARA MOSTRAR TODO
+        self.iteraciones = []
 
-        self.distancias = None
-        self.predecesores = None
-        self.rutas = None
+    def resolver(self, origen_idx):
+        self.dist[origen_idx] = 0
+        cola = [(0, origen_idx)]
 
-    def _construir_adyacencia(self) -> List[List[Tuple[int, float]]]:
-        """Construye lista de adyacencia desde matriz de distancias"""
-        adyacencia = [[] for _ in range(self.n)]
-
-        for i in range(self.n):
-            for j in range(self.n):
-                if i != j and not np.isinf(self.matriz_distancias[i, j]):
-                    adyacencia[i].append((j, self.matriz_distancias[i, j]))
-
-        return adyacencia
-
-    def resolver(self, nodo_origen: int = 0) -> Dict:
-        """
-        Ejecuta el algoritmo de Dijkstra desde un nodo origen
-
-        Parámetro:
-        - nodo_origen: índice del nodo de partida
-        """
-        self.distancias = [np.inf] * self.n
-        self.predecesores = [-1] * self.n
-        visitados = set()
-
-        # Distancia del origen a sí mismo es 0
-        self.distancias[nodo_origen] = 0
-
-        # Cola de prioridad: (distancia, nodo)
-        cola = [(0, nodo_origen)]
+        # Estado inicial
+        self._guardar_iteracion(
+            nodo_fijado=None,
+            relajaciones=[]
+        )
 
         while cola:
-            dist_actual, u = heapq.heappop(cola)
-
-            if u in visitados:
+            _, u = heapq.heappop(cola)
+            if u in self.visitados:
                 continue
 
-            visitados.add(u)
+            self.visitados.add(u)
+            relajaciones = []
 
-            # Si la distancia almacenada es menor, continuar
-            if dist_actual > self.distancias[u]:
-                continue
+            # Relajar aristas u -> v
+            for v in range(self.n):
+                costo = self.matriz[u][v]
+                if costo == math.inf or v in self.visitados:
+                    continue
 
-            # Revisar vecinos
-            for v, peso in self.adyacencia[u]:
-                if v not in visitados:
-                    nueva_dist = self.distancias[u] + peso
+                antes = self.dist[v]
+                nueva = self.dist[u] + costo
 
-                    if nueva_dist < self.distancias[v]:
-                        self.distancias[v] = nueva_dist
-                        self.predecesores[v] = u
-                        heapq.heappush(cola, (nueva_dist, v))
+                # GUARDAMOS DATOS (DINÁMICOS)
+                relajaciones.append({
+                    "desde": self.nodos[u],
+                    "hacia": self.nodos[v],
+                    "dist_u": self.dist[u],
+                    "costo": costo,
+                    "nueva": nueva,
+                    "antes": antes,
+                    "mejora": nueva < antes
+                })
 
-        return self._generar_resultado(nodo_origen)
+                if nueva < self.dist[v]:
+                    self.dist[v] = nueva
+                    self.pred[v] = u
+                    heapq.heappush(cola, (nueva, v))
 
-    def _obtener_ruta(self, nodo_destino: int) -> List[int]:
-        """Reconstruye la ruta desde origen a destino"""
-        ruta = []
-        actual = nodo_destino
+            self._guardar_iteracion(
+                nodo_fijado=self.nodos[u],
+                relajaciones=relajaciones
+            )
 
-        while actual != -1:
-            ruta.append(actual)
-            actual = self.predecesores[actual]
+        return self._resultado_final(origen_idx)
 
-        ruta.reverse()
-        return ruta
+    def _guardar_iteracion(self, nodo_fijado, relajaciones):
+        self.iteraciones.append({
+            "nodo_fijado": nodo_fijado,
+            "distancias": {
+                self.nodos[i]: (self.dist[i] if self.dist[i] != math.inf else "∞")
+                for i in range(self.n)
+            },
+            "predecesores": {
+                self.nodos[i]: (self.nodos[self.pred[i]] if self.pred[i] != -1 else None)
+                for i in range(self.n)
+            },
+            "relajaciones": relajaciones
+        })
 
-    def _generar_resultado(self, nodo_origen: int) -> Dict:
-        """Genera el resultado del algoritmo"""
-        self.rutas = {}
-
-        rutas_detalladas = []
+    def _resultado_final(self, origen_idx):
+        rutas = []
         for i in range(self.n):
-            ruta = self._obtener_ruta(i)
-            self.rutas[i] = ruta
-
-            ruta_str = " → ".join([self.nodos[j] for j in ruta])
-
-            rutas_detalladas.append({
-                'destino': self.nodos[i],
-                'distancia': float(self.distancias[i]),
-                'ruta': ruta_str,
-                'ruta_indices': ruta
+            ruta = self._reconstruir(i)
+            rutas.append({
+                "destino": self.nodos[i],
+                "distancia": self.dist[i] if self.dist[i] != math.inf else "∞",
+                "ruta": " → ".join(self.nodos[j] for j in ruta)
             })
 
-        resultado = {
-            'algoritmo': 'Dijkstra',
-            'nodo_origen': self.nodos[nodo_origen],
-            'nodo_origen_idx': nodo_origen,
-            'rutas': rutas_detalladas,
-            'distancias': {self.nodos[i]: float(self.distancias[i])
-                           for i in range(self.n)},
-            'predecesores': {self.nodos[i]: self.nodos[self.predecesores[i]]
-            if self.predecesores[i] != -1 else None
-                             for i in range(self.n)}
+        return {
+            "origen": self.nodos[origen_idx],
+            "predecesores": {
+                self.nodos[i]: (self.nodos[self.pred[i]] if self.pred[i] != -1 else None)
+                for i in range(self.n)
+            },
+            "rutas": rutas
         }
 
-        return resultado
-
-    def obtener_tabla_resultados(self) -> pd.DataFrame:
-        """Retorna tabla con resultados ordenados"""
-        if self.rutas is None:
-            return None
-
-        datos = []
-        for i in range(self.n):
-            ruta = " → ".join([self.nodos[j] for j in self.rutas[i]])
-            datos.append({
-                'Destino': self.nodos[i],
-                'Distancia': float(self.distancias[i]),
-                'Ruta': ruta
-            })
-
-        df = pd.DataFrame(datos)
-        return df.sort_values('Distancia')
-
-
-class RutaMasOscura(RutaMasCorta):
-    """
-    Variante para encontrar la ruta más larga (menos oscura)
-    Implementación del algoritmo de Bellman-Ford modificado
-    """
-
-    def resolver_bellman_ford(self, nodo_origen: int = 0) -> Dict:
-        """Implementa Bellman-Ford para detectar ciclos negativos"""
-        distancias = [np.inf] * self.n
-        predecesores = [-1] * self.n
-
-        distancias[nodo_origen] = 0
-
-        # Relajar aristas |V|-1 veces
-        for _ in range(self.n - 1):
-            for u in range(self.n):
-                if distancias[u] != np.inf:
-                    for v, peso in self.adyacencia[u]:
-                        if distancias[u] + peso < distancias[v]:
-                            distancias[v] = distancias[u] + peso
-                            predecesores[v] = u
-
-        # Verificar ciclos negativos
-        ciclo_negativo = False
-        for u in range(self.n):
-            if distancias[u] != np.inf:
-                for v, peso in self.adyacencia[u]:
-                    if distancias[u] + peso < distancias[v]:
-                        ciclo_negativo = True
-                        break
-
-        self.distancias = distancias
-        self.predecesores = predecesores
-
-        resultado = self._generar_resultado(nodo_origen)
-        resultado['ciclo_negativo_detectado'] = ciclo_negativo
-
-        return resultado
-
-
-# Ejemplo de uso
-if __name__ == "__main__":
-    # Matriz de distancias (usar np.inf para aristas no existentes)
-    inf = np.inf
-    distancias = [
-        [0, 4, 2, inf, inf, inf],  # A
-        [inf, 0, 1, 5, inf, inf],  # B
-        [inf, inf, 0, 8, 10, inf],  # C
-        [inf, inf, inf, 0, 2, 6],  # D
-        [inf, inf, inf, inf, 0, 3],  # E
-        [inf, inf, inf, inf, inf, 0]  # F
-    ]
-
-    nodos = ['A', 'B', 'C', 'D', 'E', 'F']
-
-    dijkstra = RutaMasCorta(distancias, nodos)
-    resultado = dijkstra.resolver(nodo_origen=0)
-
-    print("\n=== RESULTADO RUTA MÁS CORTA (DIJKSTRA) ===")
-    print(f"Nodo Origen: {resultado['nodo_origen']}")
-    print("\nDistancias Mínimas:")
-    for dest, dist in resultado['distancias'].items():
-        print(f"  {resultado['nodo_origen']} → {dest}: {dist}")
-
-    print("\nTabla de Resultados:")
-    print(dijkstra.obtener_tabla_resultados())
+    def _reconstruir(self, i):
+        r = []
+        while i != -1:
+            r.append(i)
+            i = self.pred[i]
+        return r[::-1]
