@@ -5,8 +5,7 @@ import pandas as pd
 
 class DosFases:
     """
-    Implementación CORRECTA del Método de Dos Fases
-    Maneja restricciones mixtas (<=, >=, =) y optimización de MIN/MAX
+    Implementación del Método de Dos Fases con historial detallado
     """
 
     def __init__(self, c: List[float], A: List[List[float]], b: List[float],
@@ -63,23 +62,18 @@ class DosFases:
         self.c = self.c_original.copy()
         self.b = self.b_original.copy()
 
-        # IMPORTANTE: Para minimización, negar la función objetivo
-        # para convertir a maximización
         if self.tipo == "min":
             self.c = -self.c
-
-        # Mapear variables originales
-        for i in range(self.n):
-            self.mapeo_columnas[i] = self.nombres_vars[i]
 
         nuevas_cols = []
         indices_vars_artificiales = []
         col_idx = self.n
 
-        # Procesar cada restricción
+        for i in range(self.n):
+            self.mapeo_columnas[i] = self.nombres_vars[i]
+
         for i, signo in enumerate(self.signos):
             if signo == "<=":
-                # Restricción <= : agregar variable de holgura
                 col_holgura = np.zeros(self.m)
                 col_holgura[i] = 1
                 nuevas_cols.append(col_holgura)
@@ -88,7 +82,6 @@ class DosFases:
                 col_idx += 1
 
             elif signo == ">=":
-                # Restricción >= : agregar variable de exceso y artificial
                 col_exceso = np.zeros(self.m)
                 col_exceso[i] = -1
                 nuevas_cols.append(col_exceso)
@@ -105,7 +98,6 @@ class DosFases:
                 col_idx += 1
 
             elif signo == "=":
-                # Restricción = : agregar variable artificial
                 col_artificial = np.zeros(self.m)
                 col_artificial[i] = 1
                 nuevas_cols.append(col_artificial)
@@ -114,12 +106,10 @@ class DosFases:
                 self.num_artificiales += 1
                 col_idx += 1
 
-        # Agregar nuevas columnas a la matriz A
         if nuevas_cols:
             matriz_nuevas = np.column_stack(nuevas_cols)
             self.A = np.hstack([self.A, matriz_nuevas])
 
-        # Extender coeficientes de función objetivo
         nuevos_coefs = np.zeros(self.A.shape[1] - len(self.c))
         self.c = np.concatenate([self.c, nuevos_coefs])
 
@@ -129,12 +119,10 @@ class DosFases:
         """Construye tabla para Fase 1"""
         tabla = np.hstack([self.A, self.b.reshape(-1, 1)])
 
-        # Función objetivo Fase 1: minimizar suma de artificiales
         c_fase1 = np.zeros(self.A.shape[1])
         for idx in self.var_artificiales_indices:
             c_fase1[idx] = 1
 
-        # Negamos para maximización
         fila_costo = np.hstack([-c_fase1, 0])
         tabla = np.vstack([tabla, fila_costo])
 
@@ -148,7 +136,7 @@ class DosFases:
         return tabla
 
     def _encontrar_columna_pivote(self, tabla: np.ndarray) -> int:
-        """Encuentra columna pivote (Regla de Dantzig)"""
+        """Encuentra columna pivote"""
         fila_costo = tabla[-1, :-1]
         col_negativas = np.where(fila_costo < -1e-10)[0]
 
@@ -158,7 +146,7 @@ class DosFases:
         return col_negativas[np.argmin(fila_costo[col_negativas])]
 
     def _encontrar_fila_pivote(self, tabla: np.ndarray, col_pivote: int) -> int:
-        """Encuentra fila pivote (Mínima razón)"""
+        """Encuentra fila pivote"""
         col = tabla[:-1, col_pivote]
         b_vals = tabla[:-1, -1]
 
@@ -175,20 +163,17 @@ class DosFases:
 
     def _pivotear(self, tabla: np.ndarray, fila_pivote: int, col_pivote: int):
         """Realiza operación de pivoteo"""
-        try:
-            pivote = tabla[fila_pivote, col_pivote]
+        pivote = tabla[fila_pivote, col_pivote]
 
-            if abs(pivote) < 1e-10:
-                raise ValueError("Elemento pivote muy pequeño")
+        if abs(pivote) < 1e-10:
+            raise ValueError("Elemento pivote muy pequeño")
 
-            tabla[fila_pivote, :] /= pivote
+        tabla[fila_pivote, :] /= pivote
 
-            for i in range(tabla.shape[0]):
-                if i != fila_pivote:
-                    factor = tabla[i, col_pivote]
-                    tabla[i, :] -= factor * tabla[fila_pivote, :]
-        except:
-            pass
+        for i in range(tabla.shape[0]):
+            if i != fila_pivote:
+                factor = tabla[i, col_pivote]
+                tabla[i, :] -= factor * tabla[fila_pivote, :]
 
     def _crear_dataframe_tabla(self, tabla: np.ndarray) -> pd.DataFrame:
         """Crea DataFrame de tabla"""
@@ -205,7 +190,6 @@ class DosFases:
         """Fase 1: Encontrar solución básica factible"""
         self.tabla_fase1 = self._construir_tabla_fase1()
 
-        # Inicializar base
         self.base = []
         col_actual = self.n
 
@@ -213,14 +197,9 @@ class DosFases:
             if self.signos[i] == "<=":
                 self.base.append(col_actual)
                 col_actual += 1
-            elif self.signos[i] == ">=":
-                # Variable de exceso
-                col_actual += 1
-                # Variable artificial
-                self.base.append(col_actual)
-                col_actual += 1
-            elif self.signos[i] == "=":
-                # Variable artificial
+            elif self.signos[i] == ">=" or self.signos[i] == "=":
+                if self.signos[i] == ">=":
+                    col_actual += 1
                 self.base.append(col_actual)
                 col_actual += 1
 
@@ -261,7 +240,6 @@ class DosFases:
                 'variable_sale': var_sale
             })
 
-        # Verificar factibilidad
         valor_fase1 = -self.tabla_fase1[-1, -1]
 
         if valor_fase1 > 1e-6:
@@ -273,7 +251,6 @@ class DosFases:
         """Fase 2: Optimizar con función objetivo original"""
         self.tabla_fase2 = self._construir_tabla_fase2()
 
-        # Ajustar fila de costo basada en la base actual
         for i, var_base in enumerate(self.base):
             if var_base < self.A.shape[1]:
                 self.tabla_fase2[-1, :] -= self.c[var_base] * self.tabla_fase2[i, :]
@@ -327,7 +304,6 @@ class DosFases:
 
         valor = -self.tabla_fase2[-1, -1]
 
-        # IMPORTANTE: Si el tipo es MIN, negamos el valor
         if self.tipo == "min":
             self.valor_optimo = -valor
         else:
@@ -376,7 +352,6 @@ class DosFases:
         else:
             estado = "ERROR"
 
-        # Construcción de diccionarios de solución
         solucion_dict = {}
         for i in range(self.n):
             if self.solucion is not None:
