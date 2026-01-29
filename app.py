@@ -391,7 +391,8 @@ elif menu_principal == "🌐 Problemas de Redes":
         "Seleccione el método de redes:",
         (
             "Ruta más corta (Dijkstra)",
-            "Flujo de costo mínimo"
+            "Flujo de costo mínimo",
+            "Flujo máximo",
         )
     )
 
@@ -399,6 +400,7 @@ elif menu_principal == "🌐 Problemas de Redes":
     from models.redes.ruta_corta import RutaMasCorta
     from models.redes.adaptadores import red_a_matriz_distancias
     from models.redes.flujo_costo_minimo import FlujoCostoMinimo
+    from models.redes.flujo_maximo import FlujoMaximo
     import pandas as pd
     import math
 
@@ -542,181 +544,232 @@ elif menu_principal == "🌐 Problemas de Redes":
         # ====================================================
     # FLUJO DE COSTO MINIMO
     # ====================================================
-    st.subheader("Flujo de Costo Mínimo")
-
-    # --------------------------------------------------
-    # CONFIGURACIÓN
-    # --------------------------------------------------
-    nodos_input = st.text_input(
-        "Nodos (ej: S,A,B,T)",
-        value="S,A,B,T",
-        key="fcm_nodos"
-    )
-    nodos = [n.strip() for n in nodos_input.split(",") if n.strip()]
-
-    if len(nodos) < 2:
-        st.warning("Ingrese al menos 2 nodos")
-        st.stop()
-
-    origen = st.selectbox("Nodo origen", nodos, key="fcm_origen")
-    destino = st.selectbox("Nodo destino", nodos, key="fcm_destino")
-
-    flujo_requerido = st.number_input(
-        "Flujo requerido",
-        min_value=1,
-        value=4,
-        step=1
-    )
-
-    num_arcos = st.number_input(
-        "Número de arcos",
-        min_value=1,
-        value=4,
-        step=1
-    )
-
-    # --------------------------------------------------
-    # DEFINICIÓN DE ARCOS
-    # --------------------------------------------------
-    arcos = []
-    for i in range(num_arcos):
-        st.markdown(f"**Arco {i+1}**")
-        c1, c2, c3, c4 = st.columns(4)
-
-        with c1:
-            o = st.selectbox("Origen", nodos, key=f"fcm_o{i}")
-        with c2:
-            d = st.selectbox("Destino", nodos, key=f"fcm_d{i}")
-        with c3:
-            cap = st.number_input(
-                "Capacidad",
-                min_value=1,
-                value=1,
-                key=f"fcm_cap{i}"
-            )
-        with c4:
-            costo = st.number_input(
-                "Costo",
-                value=1.0,
-                key=f"fcm_costo{i}"
-            )
-
-        arcos.append((o, d, cap, costo))
-
-    # --------------------------------------------------
-    # RUTAS POSIBLES (ANÁLISIS PREVIO)
-    # --------------------------------------------------
-    st.subheader("Rutas posibles (análisis previo)")
-
-    arcos_dict = {}
-    for (oo, dd, cap, costo) in arcos:
-        arcos_dict.setdefault(oo, []).append((dd, cap, costo))
-
-    def enumerar_rutas(actual, destino, visitados=None, ruta=None):
-        if visitados is None:
-            visitados = set()
-        if ruta is None:
-            ruta = [actual]
-
-        if actual == destino:
-            return [ruta]
-
-        visitados.add(actual)
-        rutas = []
-
-        for (sig, cap, costo) in arcos_dict.get(actual, []):
-            if sig in visitados:
-                continue
-            nuevas = enumerar_rutas(sig, destino, visitados.copy(), ruta + [sig])
-            rutas.extend(nuevas)
-
-        return rutas
-
-    rutas = enumerar_rutas(origen, destino)
-
-    if rutas:
-        filas = []
-        for r in rutas:
-            costo_total = 0
-            caps = []
-
-            for i2 in range(len(r) - 1):
-                u = r[i2]
-                v = r[i2 + 1]
-                for (oo, dd, cap, costo) in arcos:
-                    if oo == u and dd == v:
-                        costo_total += costo
-                        caps.append(cap)
-                        break
-
-            filas.append({
-                "Ruta": " → ".join(r),
-                "Costo ruta": costo_total,
-                "Capacidad (cuello de botella)": min(caps) if caps else 0
-            })
-
-        st.dataframe(pd.DataFrame(filas), width="stretch")
-    else:
-        st.warning("No existen rutas posibles entre el origen y el destino.")
-
-    # --------------------------------------------------
-    # RESOLVER
-    # --------------------------------------------------
-    if st.button("🚀 Resolver Flujo de Costo Mínimo"):
-
-        solver = FlujoCostoMinimo(nodos)
-
-        for o, d, cap, costo in arcos:
-            solver.agregar_arco(o, d, cap, costo)
-
-        resultado = solver.resolver(origen, destino, flujo_requerido)
+    
+    elif metodo_red == "Flujo de costo mínimo":
+        
+        
+        st.subheader("Flujo de Costo Mínimo")
 
         # --------------------------------------------------
-        # ITERACIONES
+        # CONFIGURACIÓN
         # --------------------------------------------------
-        st.subheader("Proceso paso a paso")
+        nodos_input = st.text_input(
+            "Nodos (ej: S,A,B,T)",
+            value="S,A,B,T",
+            key="fcm_nodos"
+        )
+        nodos = [n.strip() for n in nodos_input.split(",") if n.strip()]
 
-        for i, it in enumerate(resultado["iteraciones"]):
-            st.markdown(f"### Iteración {i+1}")
+        if len(nodos) < 2:
+            st.warning("Ingrese al menos 2 nodos")
+            st.stop()
 
-            # 🔧 FIX DEFINITIVO: RUTA SIN DUPLICADOS
-            ruta_nodos = [it["ruta"][0][0]] + [v for (u, v) in it["ruta"]]
-            ruta_txt = " → ".join(ruta_nodos)
-            st.write(f"Ruta seleccionada: {ruta_txt}")
+        origen = st.selectbox("Nodo origen", nodos, key="fcm_origen")
+        destino = st.selectbox("Nodo destino", nodos, key="fcm_destino")
 
-            st.markdown("**Detalle arco por arco:**")
-            costo_ruta = 0
-            caps = []
+        flujo_requerido = st.number_input(
+            "Flujo requerido",
+            min_value=1,
+            value=4,
+            step=1
+        )
 
-            for (u, v) in it["ruta"]:
-                for (oo, dd, cap, costo) in arcos:
-                    if oo == u and dd == v:
-                        st.write(f"{u} → {v} | capacidad = {cap} | costo = {costo}")
-                        costo_ruta += costo
-                        caps.append(cap)
-                        break
-
-            cuello = min(caps) if caps else 0
-
-            st.write(f"**Costo de la ruta = {costo_ruta}**")
-            st.write(f"**Cuello de botella = {cuello}**")
-            st.write(f"Flujo enviado: {it['flujo_enviado']}")
-            st.write(f"Flujo restante: {it['flujo_restante']}")
-
-            st.markdown(
-                f"**Cuenta:** {it['flujo_enviado']} × {it['costo_ruta']} "
-                f"= {it['flujo_enviado'] * it['costo_ruta']}"
-            )
-
-            st.write(f"Costo acumulado: {it['costo_acumulado']}")
-            st.divider()
+        num_arcos = st.number_input(
+            "Número de arcos",
+            min_value=1,
+            value=4,
+            step=1
+        )
 
         # --------------------------------------------------
-        # RESULTADO FINAL
+        # DEFINICIÓN DE ARCOS
         # --------------------------------------------------
-        st.success(f"Costo total mínimo = {resultado['costo_total']}")
+        arcos = []
+        for i in range(num_arcos):
+            st.markdown(f"**Arco {i+1}**")
+            c1, c2, c3, c4 = st.columns(4)
+
+            with c1:
+                o = st.selectbox("Origen", nodos, key=f"fcm_o{i}")
+            with c2:
+                d = st.selectbox("Destino", nodos, key=f"fcm_d{i}")
+            with c3:
+                cap = st.number_input(
+                    "Capacidad",
+                    min_value=1,
+                    value=1,
+                    key=f"fcm_cap{i}"
+                )
+            with c4:
+                costo = st.number_input(
+                    "Costo",
+                    value=1.0,
+                    key=f"fcm_costo{i}"
+                )
+
+            arcos.append((o, d, cap, costo))
+
+        # --------------------------------------------------
+        # RUTAS POSIBLES (ANÁLISIS PREVIO)
+        # --------------------------------------------------
+        st.subheader("Rutas posibles (análisis previo)")
+
+        arcos_dict = {}
+        for (oo, dd, cap, costo) in arcos:
+            arcos_dict.setdefault(oo, []).append((dd, cap, costo))
+
+        def enumerar_rutas(actual, destino, visitados=None, ruta=None):
+            if visitados is None:
+                visitados = set()
+            if ruta is None:
+                ruta = [actual]
+
+            if actual == destino:
+                return [ruta]
+
+            visitados.add(actual)
+            rutas = []
+
+            for (sig, cap, costo) in arcos_dict.get(actual, []):
+                if sig in visitados:
+                    continue
+                nuevas = enumerar_rutas(sig, destino, visitados.copy(), ruta + [sig])
+                rutas.extend(nuevas)
+
+            return rutas
+
+        rutas = enumerar_rutas(origen, destino)
+
+        if rutas:
+            filas = []
+            for r in rutas:
+                costo_total = 0
+                caps = []
+
+                for i2 in range(len(r) - 1):
+                    u = r[i2]
+                    v = r[i2 + 1]
+                    for (oo, dd, cap, costo) in arcos:
+                        if oo == u and dd == v:
+                            costo_total += costo
+                            caps.append(cap)
+                            break
+
+                filas.append({
+                    "Ruta": " → ".join(r),
+                    "Costo ruta": costo_total,
+                    "Capacidad (cuello de botella)": min(caps) if caps else 0
+                })
+
+            st.dataframe(pd.DataFrame(filas), width="stretch")
+        else:
+            st.warning("No existen rutas posibles entre el origen y el destino.")
+
+        # --------------------------------------------------
+        # RESOLVER
+        # --------------------------------------------------
+        if st.button("🚀 Resolver Flujo de Costo Mínimo"):
+
+            solver = FlujoCostoMinimo(nodos)
+
+            for o, d, cap, costo in arcos:
+                solver.agregar_arco(o, d, cap, costo)
+
+            resultado = solver.resolver(origen, destino, flujo_requerido)
+
+            # --------------------------------------------------
+            # ITERACIONES
+            # --------------------------------------------------
+            st.subheader("Proceso paso a paso")
+
+            for i, it in enumerate(resultado["iteraciones"]):
+                st.markdown(f"### Iteración {i+1}")
+
+                # 🔧 FIX DEFINITIVO: RUTA SIN DUPLICADOS
+                ruta_nodos = [it["ruta"][0][0]] + [v for (u, v) in it["ruta"]]
+                ruta_txt = " → ".join(ruta_nodos)
+                st.write(f"Ruta seleccionada: {ruta_txt}")
+
+                st.markdown("**Detalle arco por arco:**")
+                costo_ruta = 0
+                caps = []
+
+                for (u, v) in it["ruta"]:
+                    for (oo, dd, cap, costo) in arcos:
+                        if oo == u and dd == v:
+                            st.write(f"{u} → {v} | capacidad = {cap} | costo = {costo}")
+                            costo_ruta += costo
+                            caps.append(cap)
+                            break
+
+                cuello = min(caps) if caps else 0
+
+                st.write(f"**Costo de la ruta = {costo_ruta}**")
+                st.write(f"**Cuello de botella = {cuello}**")
+                st.write(f"Flujo enviado: {it['flujo_enviado']}")
+                st.write(f"Flujo restante: {it['flujo_restante']}")
+
+                st.markdown(
+                    f"**Cuenta:** {it['flujo_enviado']} × {it['costo_ruta']} "
+                    f"= {it['flujo_enviado'] * it['costo_ruta']}"
+                )
+
+                st.write(f"Costo acumulado: {it['costo_acumulado']}")
+                st.divider()
+
+            # --------------------------------------------------
+            # RESULTADO FINAL
+            # --------------------------------------------------
+            st.success(f"Costo total mínimo = {resultado['costo_total']}")
 
 
+    # ====================================================
+    # FLUJO MÁXIMO
+    # ====================================================
+    elif metodo_red == "Flujo máximo":
+
+        st.subheader("Flujo Máximo – Edmonds-Karp")
+
+        nodos_input = st.text_input("Nodos (ej: S,A,B,T)", value="S,A,B,T", key="fm_nodos")
+        nodos = [n.strip() for n in nodos_input.split(",") if n.strip()]
+        if len(nodos) < 2:
+            st.warning("Ingrese al menos 2 nodos")
+            st.stop()
+
+        origen = st.selectbox("Nodo origen", nodos, key="fm_origen")
+        destino = st.selectbox("Nodo destino", nodos, key="fm_destino")
+
+        num_arcos = st.number_input("Número de arcos", min_value=1, value=4)
+
+        arcos = []
+        for i in range(num_arcos):
+            st.markdown(f"**Arco {i+1}**")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                o = st.selectbox("Origen", nodos, key=f"fm_o{i}")
+            with c2:
+                d = st.selectbox("Destino", nodos, key=f"fm_d{i}")
+            with c3:
+                cap = st.number_input("Capacidad", min_value=1, value=1, key=f"fm_cap{i}")
+            arcos.append((o, d, cap))
+
+        if st.button("🚀 Resolver Flujo Máximo"):
+            solver = FlujoMaximo(nodos)
+            for o, d, cap in arcos:
+                solver.agregar_arco(o, d, cap)
+
+            resultado = solver.resolver(origen, destino)
+
+            st.subheader("Proceso paso a paso")
+            for i, it in enumerate(resultado["iteraciones"]):
+                st.markdown(f"### Iteración {i+1}")
+                ruta = [it["ruta"][0][0]] + [v for (_, v) in it["ruta"]]
+                st.write("Ruta:", " → ".join(ruta))
+                st.write("Flujo enviado:", it["flujo_enviado"])
+                st.write("Flujo acumulado:", it["flujo_acumulado"])
+                st.divider()
+
+            st.success(f"Flujo máximo total = {resultado['flujo_maximo']}")
 
 
 
