@@ -384,146 +384,339 @@ elif menu_principal == "📈 Programación Lineal":
 # SECCIÓN: PROBLEMAS DE REDES
 # ============================================
 elif menu_principal == "🌐 Problemas de Redes":
+
     st.markdown("<h2 class='section-header'>Problemas de Redes</h2>", unsafe_allow_html=True)
+
+    metodo_red = st.radio(
+        "Seleccione el método de redes:",
+        (
+            "Ruta más corta (Dijkstra)",
+            "Flujo de costo mínimo"
+        )
+    )
 
     from models.redes.red import Red
     from models.redes.ruta_corta import RutaMasCorta
     from models.redes.adaptadores import red_a_matriz_distancias
+    from models.redes.flujo_costo_minimo import FlujoCostoMinimo
     import pandas as pd
     import math
 
-    st.subheader("Configuración del Problema")
+    # ====================================================
+    # RUTA MÁS CORTA
+    # ====================================================
+    if metodo_red == "Ruta más corta (Dijkstra)":
 
-    nodos_input = st.text_input("Nodos (ej: A,B,C,D)", value="A,B,C,D")
+        st.subheader("Ruta más corta – Algoritmo de Dijkstra")
+
+        st.subheader("Configuración del Problema")
+
+        nodos_input = st.text_input("Nodos (ej: A,B,C,D)", value="A,B,C,D")
+        nodos = [n.strip() for n in nodos_input.split(",") if n.strip()]
+        if len(nodos) < 2:
+            st.warning("Ingrese al menos 2 nodos")
+            st.stop()
+
+        num_arcos = st.number_input("Número de arcos", min_value=1, value=4)
+
+        arcos = []
+        for i in range(num_arcos):
+            st.markdown(f"**Arco {i+1}**")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                o = st.selectbox("Origen", nodos, key=f"o{i}")
+            with c2:
+                d = st.selectbox("Destino", nodos, key=f"d{i}")
+            with c3:
+                c = st.number_input("Costo", value=1.0, key=f"c{i}")
+            arcos.append((o, d, c))
+
+        origen = st.selectbox("Nodo origen", nodos)
+
+        if st.button("🚀 Resolver"):
+            red = Red(nodos)
+            for o, d, c in arcos:
+                red.agregar_arco(o, d, costo=c)
+
+            matriz, nodos_orden = red_a_matriz_distancias(red)
+            idx_origen = nodos_orden.index(origen)
+
+            solver = RutaMasCorta(matriz, nodos_orden)
+            resultado = solver.resolver(idx_origen)
+
+            # -------- ESTADO INICIAL --------
+            st.subheader("Estado inicial del algoritmo")
+            df_init = pd.DataFrame({
+                "Nodo": nodos_orden,
+                "Distancia inicial": ["0" if n == origen else "∞" for n in nodos_orden],
+                "Predecesor": ["—"] * len(nodos_orden)
+            })
+            st.dataframe(df_init, width="stretch")
+
+            # -------- ITERACIONES + CUENTAS --------
+            st.subheader("Proceso paso a paso (Iteraciones de Dijkstra)")
+
+            for i, it in enumerate(solver.iteraciones):
+                st.markdown(f"### Iteración {i+1}")
+                st.write("Nodo fijado:", it["nodo_fijado"] if it["nodo_fijado"] else "—")
+
+                df_it = pd.DataFrame({
+                    "Nodo": list(it["distancias"].keys()),
+                    "Distancia": [str(x) for x in it["distancias"].values()],
+                    "Predecesor": [
+                        it["predecesores"][n] if it["predecesores"][n] else "—"
+                        for n in it["distancias"].keys()
+                    ]
+                })
+                st.dataframe(df_it, width="stretch")
+
+                if it["relajaciones"]:
+                    st.markdown("**Relajaciones realizadas:**")
+                    for r in it["relajaciones"]:
+                        antes = r["antes"] if r["antes"] != math.inf else "∞"
+                        tag = " → mejora" if r["mejora"] else ""
+                        st.write(
+                            f"{r['desde']} → {r['hacia']}: "
+                            f"{r['dist_u']} + {r['costo']} = {r['nueva']} "
+                            f"(antes {antes}){tag}"
+                        )
+
+            # -------- ÁRBOL --------
+            st.subheader("Árbol de Rutas Mínimas")
+
+            def imprimir_arbol(predecesores, origen):
+                hijos = {}
+                for n, p in predecesores.items():
+                    if p:
+                        hijos.setdefault(p, []).append(n)
+
+                def dfs(nodo, nivel=0):
+                    pref = ("│   " * (nivel - 1) + "└── ") if nivel > 0 else ""
+                    txt = pref + f"{nodo}\n"
+                    for h in hijos.get(nodo, []):
+                        txt += dfs(h, nivel + 1)
+                    return txt
+
+                return dfs(origen)
+
+            st.code(imprimir_arbol(resultado["predecesores"], origen))
+
+            # -------- RESULTADO FINAL --------
+            st.subheader("Resultado Final")
+
+            df = pd.DataFrame(resultado["rutas"])
+            df["distancia"] = df["distancia"].astype(str)
+            st.dataframe(df, width="stretch")
+
+            # -------- DESGLOSE DE COSTOS POR RUTA --------
+            st.subheader("Desglose del costo por ruta")
+
+            idx = {n: i for i, n in enumerate(nodos_orden)}
+
+            for r in resultado["rutas"]:
+                destino = r["destino"]
+                ruta_str = r["ruta"]
+
+                st.markdown(f"**Destino: {destino}**")
+                st.write(f"Ruta: {ruta_str}")
+
+                nodos_ruta = [x.strip() for x in ruta_str.split("→")]
+
+                costos = []
+                for i in range(len(nodos_ruta) - 1):
+                    u = nodos_ruta[i]
+                    v = nodos_ruta[i + 1]
+                    costo = matriz[idx[u]][idx[v]]
+                    costos.append(costo)
+                    st.write(f"{u} → {v} = {costo}")
+
+                if costos:
+                    suma = " + ".join(str(c) for c in costos)
+                    total = sum(costos)
+                    st.write(f"**Total = {suma} = {total}**")
+                else:
+                    st.write("**Total = 0**")
+
+                st.divider()
+
+        # ====================================================
+    # FLUJO DE COSTO MINIMO
+    # ====================================================
+    st.subheader("Flujo de Costo Mínimo")
+
+    # --------------------------------------------------
+    # CONFIGURACIÓN
+    # --------------------------------------------------
+    nodos_input = st.text_input(
+        "Nodos (ej: S,A,B,T)",
+        value="S,A,B,T",
+        key="fcm_nodos"
+    )
     nodos = [n.strip() for n in nodos_input.split(",") if n.strip()]
+
     if len(nodos) < 2:
         st.warning("Ingrese al menos 2 nodos")
         st.stop()
 
-    num_arcos = st.number_input("Número de arcos", min_value=1, value=4)
+    origen = st.selectbox("Nodo origen", nodos, key="fcm_origen")
+    destino = st.selectbox("Nodo destino", nodos, key="fcm_destino")
 
+    flujo_requerido = st.number_input(
+        "Flujo requerido",
+        min_value=1,
+        value=4,
+        step=1
+    )
+
+    num_arcos = st.number_input(
+        "Número de arcos",
+        min_value=1,
+        value=4,
+        step=1
+    )
+
+    # --------------------------------------------------
+    # DEFINICIÓN DE ARCOS
+    # --------------------------------------------------
     arcos = []
     for i in range(num_arcos):
         st.markdown(f"**Arco {i+1}**")
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
+
         with c1:
-            o = st.selectbox("Origen", nodos, key=f"o{i}")
+            o = st.selectbox("Origen", nodos, key=f"fcm_o{i}")
         with c2:
-            d = st.selectbox("Destino", nodos, key=f"d{i}")
+            d = st.selectbox("Destino", nodos, key=f"fcm_d{i}")
         with c3:
-            c = st.number_input("Costo", value=1.0, key=f"c{i}")
-        arcos.append((o, d, c))
+            cap = st.number_input(
+                "Capacidad",
+                min_value=1,
+                value=1,
+                key=f"fcm_cap{i}"
+            )
+        with c4:
+            costo = st.number_input(
+                "Costo",
+                value=1.0,
+                key=f"fcm_costo{i}"
+            )
 
-    origen = st.selectbox("Nodo origen", nodos)
+        arcos.append((o, d, cap, costo))
 
-    if st.button("🚀 Resolver"):
-        red = Red(nodos)
-        for o, d, c in arcos:
-            red.agregar_arco(o, d, costo=c)
+    # --------------------------------------------------
+    # RUTAS POSIBLES (ANÁLISIS PREVIO)
+    # --------------------------------------------------
+    st.subheader("Rutas posibles (análisis previo)")
 
-        matriz, nodos_orden = red_a_matriz_distancias(red)
-        idx_origen = nodos_orden.index(origen)
+    arcos_dict = {}
+    for (oo, dd, cap, costo) in arcos:
+        arcos_dict.setdefault(oo, []).append((dd, cap, costo))
 
-        solver = RutaMasCorta(matriz, nodos_orden)
-        resultado = solver.resolver(idx_origen)
+    def enumerar_rutas(actual, destino, visitados=None, ruta=None):
+        if visitados is None:
+            visitados = set()
+        if ruta is None:
+            ruta = [actual]
 
-        # -------- ESTADO INICIAL --------
-        st.subheader("Estado inicial del algoritmo")
-        df_init = pd.DataFrame({
-            "Nodo": nodos_orden,
-            "Distancia inicial": ["0" if n == origen else "∞" for n in nodos_orden],
-            "Predecesor": ["—"] * len(nodos_orden)
-        })
-        st.dataframe(df_init, width="stretch")
+        if actual == destino:
+            return [ruta]
 
-        # -------- ITERACIONES + CUENTAS --------
-        st.subheader("Proceso paso a paso (Iteraciones de Dijkstra)")
+        visitados.add(actual)
+        rutas = []
 
-        for i, it in enumerate(solver.iteraciones):
-            st.markdown(f"### Iteración {i+1}")
-            st.write("Nodo fijado:", it["nodo_fijado"] if it["nodo_fijado"] else "—")
+        for (sig, cap, costo) in arcos_dict.get(actual, []):
+            if sig in visitados:
+                continue
+            nuevas = enumerar_rutas(sig, destino, visitados.copy(), ruta + [sig])
+            rutas.extend(nuevas)
 
-            # 🔧 FIX 1: TODO A STRING (Arrow)
-            df_it = pd.DataFrame({
-                "Nodo": list(it["distancias"].keys()),
-                "Distancia": [str(x) for x in it["distancias"].values()],
-                "Predecesor": [
-                    it["predecesores"][n] if it["predecesores"][n] else "—"
-                    for n in it["distancias"].keys()
-                ]
+        return rutas
+
+    rutas = enumerar_rutas(origen, destino)
+
+    if rutas:
+        filas = []
+        for r in rutas:
+            costo_total = 0
+            caps = []
+
+            for i2 in range(len(r) - 1):
+                u = r[i2]
+                v = r[i2 + 1]
+                for (oo, dd, cap, costo) in arcos:
+                    if oo == u and dd == v:
+                        costo_total += costo
+                        caps.append(cap)
+                        break
+
+            filas.append({
+                "Ruta": " → ".join(r),
+                "Costo ruta": costo_total,
+                "Capacidad (cuello de botella)": min(caps) if caps else 0
             })
-            st.dataframe(df_it, width="stretch")
 
-            # >>> CUENTAS DINÁMICAS <<<
-            if it["relajaciones"]:
-                st.markdown("**Relajaciones realizadas:**")
-                for r in it["relajaciones"]:
-                    antes = r["antes"] if r["antes"] != math.inf else "∞"
-                    tag = " → mejora" if r["mejora"] else ""
-                    st.write(
-                        f"{r['desde']} → {r['hacia']}: "
-                        f"{r['dist_u']} + {r['costo']} = {r['nueva']} "
-                        f"(antes {antes}){tag}"
-                    )
+        st.dataframe(pd.DataFrame(filas), width="stretch")
+    else:
+        st.warning("No existen rutas posibles entre el origen y el destino.")
 
-        # -------- ÁRBOL --------
-        st.subheader("Árbol de Rutas Mínimas")
+    # --------------------------------------------------
+    # RESOLVER
+    # --------------------------------------------------
+    if st.button("🚀 Resolver Flujo de Costo Mínimo"):
 
-        def imprimir_arbol(predecesores, origen):
-            hijos = {}
-            for n, p in predecesores.items():
-                if p:
-                    hijos.setdefault(p, []).append(n)
+        solver = FlujoCostoMinimo(nodos)
 
-            def dfs(nodo, nivel=0):
-                pref = ("│   " * (nivel - 1) + "└── ") if nivel > 0 else ""
-                txt = pref + f"{nodo}\n"
-                for h in hijos.get(nodo, []):
-                    txt += dfs(h, nivel + 1)
-                return txt
+        for o, d, cap, costo in arcos:
+            solver.agregar_arco(o, d, cap, costo)
 
-            return dfs(origen)
+        resultado = solver.resolver(origen, destino, flujo_requerido)
 
-        st.code(imprimir_arbol(resultado["predecesores"], origen))
+        # --------------------------------------------------
+        # ITERACIONES
+        # --------------------------------------------------
+        st.subheader("Proceso paso a paso")
 
-        # -------- RESULTADO FINAL --------
-        st.subheader("Resultado Final")
+        for i, it in enumerate(resultado["iteraciones"]):
+            st.markdown(f"### Iteración {i+1}")
 
-        df = pd.DataFrame(resultado["rutas"])
-        # 🔧 FIX 2: DISTANCIA A STRING (Arrow)
-        df["distancia"] = df["distancia"].astype(str)
-        st.dataframe(df, width="stretch")
+            # 🔧 FIX DEFINITIVO: RUTA SIN DUPLICADOS
+            ruta_nodos = [it["ruta"][0][0]] + [v for (u, v) in it["ruta"]]
+            ruta_txt = " → ".join(ruta_nodos)
+            st.write(f"Ruta seleccionada: {ruta_txt}")
 
-        # -------- DESGLOSE DE COSTOS POR RUTA --------
-        st.subheader("Desglose del costo por ruta")
+            st.markdown("**Detalle arco por arco:**")
+            costo_ruta = 0
+            caps = []
 
-        idx = {n: i for i, n in enumerate(nodos_orden)}
+            for (u, v) in it["ruta"]:
+                for (oo, dd, cap, costo) in arcos:
+                    if oo == u and dd == v:
+                        st.write(f"{u} → {v} | capacidad = {cap} | costo = {costo}")
+                        costo_ruta += costo
+                        caps.append(cap)
+                        break
 
-        for r in resultado["rutas"]:
-            destino = r["destino"]
-            ruta_str = r["ruta"]
+            cuello = min(caps) if caps else 0
 
-            st.markdown(f"**Destino: {destino}**")
-            st.write(f"Ruta: {ruta_str}")
+            st.write(f"**Costo de la ruta = {costo_ruta}**")
+            st.write(f"**Cuello de botella = {cuello}**")
+            st.write(f"Flujo enviado: {it['flujo_enviado']}")
+            st.write(f"Flujo restante: {it['flujo_restante']}")
 
-            nodos_ruta = [x.strip() for x in ruta_str.split("→")]
+            st.markdown(
+                f"**Cuenta:** {it['flujo_enviado']} × {it['costo_ruta']} "
+                f"= {it['flujo_enviado'] * it['costo_ruta']}"
+            )
 
-            costos = []
-            for i in range(len(nodos_ruta) - 1):
-                u = nodos_ruta[i]
-                v = nodos_ruta[i + 1]
-                costo = matriz[idx[u]][idx[v]]
-                costos.append(costo)
-                st.write(f"{u} → {v} = {costo}")
-
-            if costos:
-                suma = " + ".join(str(c) for c in costos)
-                total = sum(costos)
-                st.write(f"**Total = {suma} = {total}**")
-            else:
-                st.write("**Total = 0**")
-
+            st.write(f"Costo acumulado: {it['costo_acumulado']}")
             st.divider()
+
+        # --------------------------------------------------
+        # RESULTADO FINAL
+        # --------------------------------------------------
+        st.success(f"Costo total mínimo = {resultado['costo_total']}")
+
+
 
 
 
