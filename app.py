@@ -393,6 +393,7 @@ elif menu_principal == "🌐 Problemas de Redes":
             "Ruta más corta (Dijkstra)",
             "Flujo de costo mínimo",
             "Flujo máximo",
+            "Árbol mínimo",
         )
     )
 
@@ -401,6 +402,7 @@ elif menu_principal == "🌐 Problemas de Redes":
     from models.redes.adaptadores import red_a_matriz_distancias
     from models.redes.flujo_costo_minimo import FlujoCostoMinimo
     from models.redes.flujo_maximo import FlujoMaximo
+    from models.redes.arbol_minimo import ArbolMinimo
     import pandas as pd
     import math
 
@@ -771,6 +773,72 @@ elif menu_principal == "🌐 Problemas de Redes":
 
             st.success(f"Flujo máximo total = {resultado['flujo_maximo']}")
 
+
+        # ====================================================
+    # ÁRBOL DE EXPANSIÓN MÍNIMA
+    # ====================================================
+    elif metodo_red == "Árbol mínimo":
+
+        st.subheader("Árbol de Expansión Mínima – Kruskal")
+
+        nodos_input = st.text_input(
+            "Nodos (ej: A,B,C,D)",
+            value="A,B,C,D",
+            key="am_nodos"
+        )
+        nodos = [n.strip() for n in nodos_input.split(",") if n.strip()]
+
+        if len(nodos) < 2:
+            st.warning("Ingrese al menos 2 nodos")
+            st.stop()
+
+        num_aristas = st.number_input(
+            "Número de aristas",
+            min_value=1,
+            value=4,
+            step=1
+        )
+
+        aristas = []
+        for i in range(num_aristas):
+            st.markdown(f"**Arista {i+1}**")
+            c1, c2, c3 = st.columns(3)
+
+            with c1:
+                u = st.selectbox("Nodo 1", nodos, key=f"am_u{i}")
+            with c2:
+                v = st.selectbox("Nodo 2", nodos, key=f"am_v{i}")
+            with c3:
+                costo = st.number_input(
+                    "Costo",
+                    value=1.0,
+                    key=f"am_c{i}"
+                )
+
+            aristas.append((u, v, costo))
+
+        if st.button("🚀 Resolver Árbol Mínimo"):
+
+            solver = ArbolMinimo(nodos)
+
+            for u, v, costo in aristas:
+                solver.agregar_arista(u, v, costo)
+
+            resultado = solver.resolver()
+
+            st.subheader("Proceso paso a paso (Kruskal)")
+            for i, it in enumerate(resultado["iteraciones"]):
+                st.markdown(f"### Iteración {i+1}")
+                st.write(f"Arista seleccionada: {it['arista']}")
+                st.write(f"Costo: {it['costo']}")
+                st.write(f"Costo acumulado: {it['costo_acumulado']}")
+                st.divider()
+
+            st.subheader("Árbol de Expansión Mínima")
+            for u, v, c in resultado["arbol"]:
+                st.write(f"{u} — {v} | costo = {c}")
+
+            st.success(f"Costo total mínimo = {resultado['costo_total']}")
 
 
 
