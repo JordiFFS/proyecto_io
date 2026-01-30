@@ -4,7 +4,8 @@ from views import (
     show_programacion_lineal,
     show_dualidad,
     show_inventarios,
-    show_historial
+    show_historial,
+    show_redes
 )
 
 # Configuración de la página
@@ -79,6 +80,8 @@ if 'metodo_seleccionado' not in st.session_state:
     st.session_state.metodo_seleccionado = "simplex"
 if 'resultado_actual' not in st.session_state:
     st.session_state.resultado_actual = None
+if 'metodo_redes' not in st.session_state:
+    st.session_state.metodo_redes = None
 
 # Header principal
 st.markdown("<h1 class='main-header'>🎯 Sistema de Optimización Empresarial</h1>", unsafe_allow_html=True)
@@ -91,6 +94,7 @@ menu_principal = st.sidebar.radio(
     ["🏠 Inicio",
      "📈 Programación Lineal",
      "🔀 Análisis de Dualidad",
+     "🌐 Problemas de Redes",
      "📦 Gestión de Inventarios",
      "📊 Historial de Resultados"]
 )
@@ -105,6 +109,9 @@ elif menu_principal == "📈 Programación Lineal":
 elif menu_principal == "🔀 Análisis de Dualidad":
     show_dualidad()
 
+elif menu_principal == "🌐 Problemas de Redes":
+    show_redes()
+
 elif menu_principal == "📦 Gestión de Inventarios":
     show_inventarios()
 
@@ -117,7 +124,7 @@ st.markdown("""
 <div style='text-align: center; color: gray; font-size: 0.8rem;'>
     <p>Sistema de Optimización Empresarial - Investigación Operativa</p>
     <p>Implementación desde Cero - Sin Librerías de Optimización</p>
-    <p>Métodos: Simplex | Gran M | Dos Fases | Dualidad</p>
-    <p>✨ Con visualización detallada de TODOS los pasos del Simplex</p>
+    <p>Métodos: Simplex | Gran M | Dos Fases | Dualidad | Redes</p>
+    <p>✨ Con visualización detallada de TODOS los pasos de cada algoritmo</p>
 </div>
 """, unsafe_allow_html=True)

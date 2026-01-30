@@ -113,7 +113,8 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("🎯 Valor Óptimo (Z)", f"{resultado['valor_optimo']:.6f}" if resultado['valor_optimo'] else "N/A")
+        valor_display = f"{resultado['valor_optimo']:.6f}" if resultado['valor_optimo'] is not None else "N/A"
+        st.metric("🎯 Valor Óptimo (Z)", valor_display)
     with col2:
         st.metric("📊 Total Iteraciones", resultado['iteraciones'])
     with col3:
@@ -151,9 +152,10 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
         """)
 
     with summary_col2:
+        valor_display = f"{resultado['valor_optimo']:.6f}" if resultado['valor_optimo'] is not None else "No encontrado"
         st.write(f"""
         **Solución:**
-        - Valor Óptimo Z = {resultado['valor_optimo']:.6f} si resultado['valor_optimo'] else 'No encontrado'
+        - Valor Óptimo Z = {valor_display}
         - Variables Básicas: {', '.join([x for x in resultado.get('base_final', []) if x.startswith('x')])}
         - Estado: {resultado.get('estado', 'N/A')}
         """)

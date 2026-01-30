@@ -45,7 +45,14 @@ def mostrar_resolucion_dual(resultado):
         st.subheader("🔵 Solución PRIMAL")
         if resultado['primal']['exito']:
             st.success(f"✓ Solución Óptima")
-            st.metric("Z Primal", f"{resultado['primal']['valor_optimo']:.6f}")
+
+            # Manejo seguro de valor_optimo
+            valor_primal = resultado['primal']['valor_optimo']
+            if valor_primal is not None:
+                st.metric("Z Primal", f"{valor_primal:.6f}")
+            else:
+                st.metric("Z Primal", "N/A")
+
             st.metric("Iteraciones", resultado['primal']['iteraciones'])
 
             primal_data = []
@@ -56,20 +63,28 @@ def mostrar_resolucion_dual(resultado):
                     'Estado': 'Básica' if val > 1e-6 else 'No Básica'
                 })
 
-            primal_df = pd.DataFrame(primal_data)
-            st.dataframe(primal_df, use_container_width=True, hide_index=True)
+            if primal_data:
+                primal_df = pd.DataFrame(primal_data)
+                st.dataframe(primal_df, use_container_width=True, hide_index=True)
         else:
             st.error("❌ No se encontró solución primal")
-            if resultado['primal']['es_no_acotado']:
+            if resultado['primal'].get('es_no_acotado', False):
                 st.write("Problema NO ACOTADO")
-            if resultado['primal']['es_infactible']:
+            if resultado['primal'].get('es_infactible', False):
                 st.write("Problema INFACTIBLE")
 
     with col2:
         st.subheader("🔴 Solución DUAL")
         if resultado['dual']['exito']:
             st.success(f"✓ Solución Óptima")
-            st.metric("Z Dual", f"{resultado['dual']['valor_optimo']:.6f}")
+
+            # Manejo seguro de valor_optimo
+            valor_dual = resultado['dual']['valor_optimo']
+            if valor_dual is not None:
+                st.metric("Z Dual", f"{valor_dual:.6f}")
+            else:
+                st.metric("Z Dual", "N/A")
+
             st.metric("Iteraciones", resultado['dual']['iteraciones'])
 
             dual_data = []
@@ -80,13 +95,14 @@ def mostrar_resolucion_dual(resultado):
                     'Estado': 'Básica' if val > 1e-6 else 'No Básica'
                 })
 
-            dual_df = pd.DataFrame(dual_data)
-            st.dataframe(dual_df, use_container_width=True, hide_index=True)
+            if dual_data:
+                dual_df = pd.DataFrame(dual_data)
+                st.dataframe(dual_df, use_container_width=True, hide_index=True)
         else:
             st.error("❌ No se encontró solución dual")
-            if resultado['dual']['es_no_acotado']:
+            if resultado['dual'].get('es_no_acotado', False):
                 st.write("Problema NO ACOTADO")
-            if resultado['dual']['es_infactible']:
+            if resultado['dual'].get('es_infactible', False):
                 st.write("Problema INFACTIBLE")
 
     st.write("---")
@@ -105,11 +121,17 @@ def mostrar_resolucion_dual(resultado):
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Z Primal", f"{resultado['primal']['valor_optimo']:.6f}")
+            valor_primal = resultado['primal']['valor_optimo']
+            valor_primal_str = f"{valor_primal:.6f}" if valor_primal is not None else "N/A"
+            st.metric("Z Primal", valor_primal_str)
         with col2:
-            st.metric("Z Dual", f"{resultado['dual']['valor_optimo']:.6f}")
+            valor_dual = resultado['dual']['valor_optimo']
+            valor_dual_str = f"{valor_dual:.6f}" if valor_dual is not None else "N/A"
+            st.metric("Z Dual", valor_dual_str)
         with col3:
-            st.metric("Diferencia", f"{resultado['diferencia_valores_optimos']:.2e}")
+            diferencia = resultado['diferencia_valores_optimos']
+            diferencia_str = f"{diferencia:.2e}" if diferencia is not None else "N/A"
+            st.metric("Diferencia", diferencia_str)
     else:
         st.markdown("""
         <div class='warning-box'>
