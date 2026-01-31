@@ -1,16 +1,21 @@
+# views/resolucion_gran_m_debug.py
+
 import streamlit as st
 import pandas as pd
 from models.programacion_lineal.gran_m import GranM
 
 
 def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
-    """Muestra la resolución completa del Gran M con diagnóstico extendido."""
+    """Muestra la resolución completa del Gran M con debug"""
+
+    # MOSTRAR DEBUG LOG
+    if 'debug_log' in resultado and resultado['debug_log']:
+        with st.expander("🔍 Ver LOG DE DEBUG (Detalle completo de la resolución)", expanded=False):
+            debug_text = "\n".join(resultado['debug_log'])
+            st.code(debug_text, language="text")
 
     if resultado['es_infactible']:
-        st.error("❌ Problema Infactible - Violación en restricciones:")
-        if 'violaciones' in resultado:
-            for violacion in resultado['violaciones']:
-                st.markdown(f"- {violacion}")
+        st.error("❌ Problema Infactible - No se pudo encontrar una solución factible.")
         return
 
     if resultado['es_no_acotado']:
@@ -141,12 +146,13 @@ def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
         - Estado: {resultado.get('estado', 'N/A')}
         """)
 
+
 def ejemplo_gran_m_coca_cola():
     """Ejemplo real de Coca-Cola - Minimización de Costos de Distribución"""
     st.subheader("📊 Ejemplo: Minimización de Costos - Coca-Cola")
 
     st.write("""
-    **Problema:** Minimizar costos de distribución desde plantas a centros de distribución
+    **Problema:** Minimizar costos de distribución desde plantas a centros
 
     **Variables:**
     - x₁ = Botellas desde Planta Quito a Centro Quito
@@ -154,24 +160,24 @@ def ejemplo_gran_m_coca_cola():
     - x₃ = Botellas desde Planta Guayaquil a Centro Cuenca
 
     **Función Objetivo:**
-    Minimizar: 0.05x₁ + 0.15x₂ + 0.12x₃ (costos en USD por botella)
+    Minimizar: 0.05x₁ + 0.15x₂ + 0.12x₃
 
     **Restricciones:**
-    - Capacidad Planta Quito: x₁ + x₂ ≤ 1,500,000
-    - Capacidad Planta Guayaquil: x₃ ≥ 400,000 (demanda mínima)
-    - Demanda Centro Quito: x₁ ≥ 300,000 (demanda mínima)
-    - Demanda Centro Guayaquil: x₂ ≥ 200,000 (demanda mínima)
-    - Demanda Centro Cuenca: x₃ ≤ 500,000 (capacidad máxima)
+    - x₁ + x₂ ≤ 1,500,000 (Capacidad Planta Quito)
+    - x₃ ≥ 400,000 (Demanda mínima Centro Cuenca)
+    - x₁ ≥ 300,000 (Demanda mínima Centro Quito)
+    - x₂ ≥ 200,000 (Demanda mínima Centro Guayaquil)
+    - x₃ ≤ 500,000 (Capacidad máxima Centro Cuenca)
     """)
 
     if st.button("Ejecutar Ejemplo Gran M", key="ej_granm_coca"):
         c = [0.05, 0.15, 0.12]
         A = [
-            [1, 1, 0],  # Capacidad Planta Quito: ≤ 1,500,000
-            [0, 0, 1],  # Capacidad Planta Guayaquil: ≥ 400,000
-            [1, 0, 0],  # Demanda Centro Quito: ≥ 300,000
-            [0, 1, 0],  # Demanda Centro Guayaquil: ≥ 200,000
-            [0, 0, 1],  # Demanda Centro Cuenca: ≤ 500,000
+            [1, 1, 0],
+            [0, 0, 1],
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
         ]
 
         b = [1500000, 400000, 300000, 200000, 500000]
@@ -212,8 +218,8 @@ def ejemplo_gran_m_coca_cola():
                 3, 5, "Minimización"
             )
         elif resultado['es_infactible']:
-            st.error("❌ Problema Infactible - No existe solución que satisfaga todas las restricciones")
+            st.error("❌ Problema Infactible")
         elif resultado['es_no_acotado']:
-            st.warning("⚠️ Problema No Acotado - La solución puede mejorar indefinidamente")
+            st.warning("⚠️ Problema No Acotado")
         else:
             st.error("❌ Error en la resolución")

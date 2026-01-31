@@ -6,7 +6,7 @@ from models.programacion_lineal.gran_m import GranM
 from models.programacion_lineal.dos_fases import DosFases
 from models.programacion_lineal.dual import Dual
 from .resolucion_simplex import mostrar_resolucion_simplex, mostrar_ejemplos
-from .resolucion_gran_m import mostrar_resolucion_gran_m
+from .resolucion_gran_m import mostrar_resolucion_gran_m, ejemplo_gran_m_coca_cola
 from .resolucion_dos_fases import mostrar_resolucion_dos_fases
 from .resolucion_dual import mostrar_resolucion_dual
 
@@ -206,4 +206,7 @@ def show_programacion_lineal():
                 st.error(traceback.format_exc())
 
     with tab2:
-        mostrar_ejemplos(metodo)
+        if metodo == "gran_m":
+            ejemplo_gran_m_coca_cola()
+        else:
+            mostrar_ejemplos(metodo)

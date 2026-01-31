@@ -34,6 +34,7 @@ class GranM:
         self.num_holgura = 0
         self.num_exceso = 0
         self.num_artificiales = 0
+        self.var_exceso_indices = []
         self.var_artificiales_indices = []
         self.mapeo_columnas = {}
 
@@ -61,6 +62,7 @@ class GranM:
 
         nuevas_cols = []
         indices_vars_artificiales = []
+        indices_vars_exceso = []
         col_idx = self.n
 
         for i in range(self.n):
@@ -80,6 +82,7 @@ class GranM:
                 col_exceso[i] = -1
                 nuevas_cols.append(col_exceso)
                 self.mapeo_columnas[col_idx] = f"e{i + 1}"
+                indices_vars_exceso.append(col_idx)
                 self.num_exceso += 1
                 col_idx += 1
 
@@ -110,46 +113,96 @@ class GranM:
         for idx in indices_vars_artificiales:
             posicion_en_nuevos = idx - n_original
             if posicion_en_nuevos >= 0 and posicion_en_nuevos < len(nuevos_coefs):
-                nuevos_coefs[posicion_en_nuevos] = self.M if self.tipo == "max" else -self.M
+                nuevos_coefs[posicion_en_nuevos] = -self.M if self.tipo == "max" else self.M
 
         self.c = np.concatenate([self.c, nuevos_coefs])
+        self.var_exceso_indices = indices_vars_exceso
         self.var_artificiales_indices = indices_vars_artificiales
 
     def _construir_tabla_inicial(self) -> np.ndarray:
-        """Construye la tabla inicial del simplex"""
+        """Construye la tabla inicial del simplex con fila de costos correcta"""
+        print("\n=== CONSTRUYENDO TABLA INICIAL ===")
         tabla = np.hstack([self.A, self.b.reshape(-1, 1)])
-        fila_costo = np.hstack([-self.c, 0])
+
+        # CORRECCIÓN: Calcular fila de costos considerando variables artificiales en la base
+        fila_costo = np.concatenate([-self.c, np.zeros(1)])
+
+        print(f"Coeficientes originales (c): {self.c_original}")
+        print(f"Coeficientes después de negación (min→max): {self.c}")
+        print(f"Fila de costos ANTES de ajustar por artificiales (primeros 5): {fila_costo[:5]}")
+
+        # Restar M veces cada fila donde hay una variable artificial en la base inicial
+        base_inicial = []
+        col_idx = self.n
+        for i in range(self.m):
+            if self.signos[i] == "<=":
+                base_inicial.append(col_idx)
+                col_idx += 1
+            elif self.signos[i] == ">=":
+                col_idx += 1  # exceso
+                base_inicial.append(col_idx)  # artificial
+                col_idx += 1
+            elif self.signos[i] == "=":
+                base_inicial.append(col_idx)  # artificial
+                col_idx += 1
+
+        print(f"Base inicial: {base_inicial}")
+        print(f"Nombres en base: {[self.mapeo_columnas.get(idx, f'var{idx}') for idx in base_inicial]}")
+        print(f"Índices de artificiales: {self.var_artificiales_indices}")
+
+        # Por cada artificial en la base, restar M veces su fila de la fila de costos
+        for i, var_base in enumerate(base_inicial):
+            if var_base in self.var_artificiales_indices:
+                # Esta es una variable artificial en la base
+                # Restar M veces la fila i de la fila de costos
+                # Nota: self.M es el valor grande, pero ya tiene el signo correcto en self.c
+                costo_penalizacion = self.M  # Siempre positivo para restar correctamente
+                print(f"  Restando {costo_penalizacion:.0f} × fila {i} de la fila de costos")
+                fila_costo[:-1] -= costo_penalizacion * self.A[i, :]
+                fila_costo[-1] -= costo_penalizacion * self.b[i]
+
+        print(f"Fila de costos DESPUÉS de ajustar por artificiales (primeros 5): {fila_costo[:5]}")
+
         tabla = np.vstack([tabla, fila_costo])
         return tabla
 
     def _encontrar_columna_pivote(self) -> int:
-        """Encuentra la columna pivote (variable que entra en la base)"""
+        """Encuentra la columna pivote (variable que entra en base)"""
         fila_costo = self.tabla_simplex[-1, :-1]
-        if self.tipo == "max":
-            col_candidatas = np.where(fila_costo < -1e-10)[0]  # Menos negativo
-        else:  # Para minimización, busca el valor más positivo
-            col_candidatas = np.where(fila_costo > 1e-10)[0]
 
-        if len(col_candidatas) == 0:
-            return -1  # No hay columnas que mejoren la solución
+        # Buscar columnas negativas EXCLUYENDO exceso y artificiales
+        col_negativas = []
+        for i in range(len(fila_costo)):
+            if fila_costo[i] < -1e-10 and i not in self.var_exceso_indices and i not in self.var_artificiales_indices:
+                col_negativas.append(i)
 
-        return col_candidatas[np.argmax(np.abs(fila_costo[col_candidatas]))]
+        print(f"\n[COLUMNA PIVOTE] Fila costos (primeros 5): {fila_costo[:5]}")
+        print(f"[COLUMNA PIVOTE] Negativos válidos: {col_negativas}")
+
+        if len(col_negativas) == 0:
+            print("[COLUMNA PIVOTE] NO hay negativos → ÓPTIMO")
+            return -1
+
+        idx_pivote = col_negativas[np.argmin(fila_costo[col_negativas])]
+        print(f"[COLUMNA PIVOTE] Seleccionada: {idx_pivote} ({self.mapeo_columnas.get(idx_pivote)})")
+        return idx_pivote
 
     def _encontrar_fila_pivote(self, col_pivote: int) -> int:
-        """Encuentra la fila pivote (variable que sale de la base)"""
+        """Encuentra la fila pivote (variable que sale de base)"""
         col = self.tabla_simplex[:-1, col_pivote]
-        b_vals = self.tabla_simplex[:-1, -1]  # RHS
+        b_vals = self.tabla_simplex[:-1, -1]
 
         razones = []
         for i in range(len(col)):
-            if col[i] > 1e-10:  # Evitar divisiones por valores muy pequeños
-                razon = b_vals[i] / col[i]  # Ratio prueba
+            if col[i] > 1e-10:
+                razon = b_vals[i] / col[i]
                 razones.append((razon, i))
 
-        if not razones:  # Si no hay razones válidas, no hay pivote
+        if not razones:
             return -1
 
-        return min(razones)[1]  # Devuelve el índice de la razón mínima
+        min_razon = min(razones, key=lambda x: x[0])
+        return min_razon[1]
 
     def _pivotear(self, fila_pivote: int, col_pivote: int):
         """Realiza la operación de pivoteo"""
@@ -163,7 +216,8 @@ class GranM:
         for i in range(self.tabla_simplex.shape[0]):
             if i != fila_pivote:
                 factor = self.tabla_simplex[i, col_pivote]
-                self.tabla_simplex[i, :] -= factor * self.tabla_simplex[fila_pivote, :]
+                if abs(factor) > 1e-10:
+                    self.tabla_simplex[i, :] -= factor * self.tabla_simplex[fila_pivote, :]
 
     def _crear_dataframe_tabla(self) -> pd.DataFrame:
         """Crea DataFrame de la tabla actual"""
@@ -175,18 +229,6 @@ class GranM:
         nombres_filas = [self.mapeo_columnas.get(var_idx, f"var{var_idx}") for var_idx in self.base] + ["Z"]
 
         return pd.DataFrame(self.tabla_simplex, columns=nombres_cols, index=nombres_filas)
-
-    def _verificar_infactibilidad(self) -> bool:
-        """Verifica si el problema es infactible"""
-        if not self.es_optimo:
-            return False
-
-        for idx in self.var_artificiales_indices:
-            if idx in self.base:
-                pos_en_base = self.base.index(idx)
-                if self.tabla_simplex[pos_en_base, -1] > 1e-6:
-                    return True
-        return False
 
     def resolver(self, verbose: bool = False) -> Dict:
         """Resuelve el problema usando el Método de Gran M"""
@@ -255,121 +297,63 @@ class GranM:
         if self.es_optimo or self.es_no_acotado:
             self._extraer_solucion()
 
-        if self._verificar_infactibilidad():
-            self.es_infactible = True
-        else:
-            # Si las artificiales están en la base con valor 0, se eliminan
-            self.base = [var for var in self.base if var not in self.var_artificiales_indices]
+        # Verificar infactibilidad
+        if self.es_optimo:
+            for idx in self.var_artificiales_indices:
+                if idx in self.base:
+                    pos = self.base.index(idx)
+                    if self.tabla_simplex[pos, -1] > 1e-4:
+                        self.es_infactible = True
+                        break
 
         return self._generar_resultado()
 
     def _extraer_solucion(self):
         """Extrae la solución"""
-        self.solucion = np.zeros(self.n)
+        print("\n=== EXTRAYENDO SOLUCIÓN ===")
+        total_variables = self.A.shape[1]
+        self.solucion = np.zeros(total_variables)
+
+        print(f"Base final (índices): {self.base}")
+        print(f"Total variables en tabla: {total_variables}")
+        print(f"Tabla final completa (últimas 2 filas):")
+        print(self.tabla_simplex[-2:])
 
         for i, var_base in enumerate(self.base):
-            if var_base < self.n:
-                self.solucion[var_base] = self.tabla_simplex[i, -1]
+            if var_base < total_variables:
+                valor = self.tabla_simplex[i, -1]
+                self.solucion[var_base] = valor
+                var_nombre = self.mapeo_columnas.get(var_base, f'var{var_base}')
+                print(f"  Fila {i}: {var_nombre} (índice {var_base}) = {valor:.2f}")
+            else:
+                print(f"  ADVERTENCIA: Índice {var_base} >= {total_variables}")
 
-        valor = -self.tabla_simplex[-1, -1]
+        # El valor en la tabla es -Z para maximización
+        # Si es minimización, ya se convirtió a maximización negando los coeficientes
+        valor_tabla = self.tabla_simplex[-1, -1]
+
+        print(f"\nValor en tabla (última posición): {valor_tabla:.2f}")
+        print(f"Tipo de optimización: {self.tipo}")
+
+        # En Simplex, la fila de costos es [-c1, -c2, ..., -Z]
+        # Entonces self.tabla_simplex[-1, -1] = -Z
+        # Para obtener Z: Z = -self.tabla_simplex[-1, -1]
 
         if self.tipo == "min":
-            self.valor_optimo = -valor
+            # Se convirtió a max negando coeficientes
+            # Entonces valor_tabla = -Z_maximizado = -(-Z_original) = Z_original
+            # Por lo tanto Z_minimizado = -valor_tabla
+            self.valor_optimo = -valor_tabla
+            print(f"Minimización detectada: Z_original = {-valor_tabla:.2f}")
         else:
-            self.valor_optimo = valor
+            # Es maximización directa
+            self.valor_optimo = -valor_tabla
+            print(f"Maximización detectada: Z = {-valor_tabla:.2f}")
 
-    def _verificar_restricciones(self) -> List[str]:
-        """Verifica si las restricciones de la solución final son válidas."""
-        violaciones = []
-        for i in range(len(self.A_original)):
-            lhs = sum(self.A_original[i][j] * self.solucion[j] for j in range(self.n))
-            signo = self.signos[i]
-            rhs = self.b_original[i]
+        print(f"Valor óptimo final: {self.valor_optimo:.2f}")
 
-            # Consultar si se viola alguna restricción
-            if signo == "<=" and lhs > rhs + 1e-6:
-                violaciones.append(f"Restricción {i + 1}: {lhs:.2f} NO cumple ≤ {rhs:.2f}")
-            elif signo == ">=" and lhs < rhs - 1e-6:
-                violaciones.append(f"Restricción {i + 1}: {lhs:.2f} NO cumple ≥ {rhs:.2f}")
-            elif signo == "=" and abs(lhs - rhs) > 1e-6:
-                violaciones.append(f"Restricción {i + 1}: {lhs:.2f} NO cumple = {rhs:.2f}")
-        return violaciones
-
-    def resolver(self, verbose: bool = False) -> Dict:
-        """Resuelve el problema usando el Método de Gran M, con detección de restricciones infactibles."""
-        self._preparar_problema()
-        self.tabla_simplex = self._construir_tabla_inicial()
-
-        # Inicializar base
-        self.base = []
-        col_actual = self.n
-
-        for i in range(self.m):
-            if self.signos[i] == "<=":
-                self.base.append(col_actual)
-                col_actual += 1
-            elif self.signos[i] == ">=" or self.signos[i] == "=":
-                if self.signos[i] == ">=":
-                    col_actual += 1
-                self.base.append(col_actual)
-                col_actual += 1
-
-        # Guardar tabla inicial
-        self.historial_tablas.append({
-            'iteracion': 0,
-            'tabla': self._crear_dataframe_tabla(),
-            'base': self.base.copy(),
-            'variable_entra': None,
-            'variable_sale': None,
-            'elemento_pivote': None,
-            'posicion_pivote': None
-        })
-
-        max_iteraciones = 1000
-
-        while self.iteraciones < max_iteraciones:
-            col_pivote = self._encontrar_columna_pivote()
-
-            if col_pivote == -1:
-                self.es_optimo = True
-                break
-
-            fila_pivote = self._encontrar_fila_pivote(col_pivote)
-
-            if fila_pivote == -1:
-                self.es_no_acotado = True
-                break
-
-            var_entra = self.mapeo_columnas.get(col_pivote, f"var{col_pivote}")
-            var_sale = self.mapeo_columnas.get(self.base[fila_pivote], f"var{self.base[fila_pivote]}")
-            elemento_pivote = float(self.tabla_simplex[fila_pivote, col_pivote])
-
-            self.base[fila_pivote] = col_pivote
-            self._pivotear(fila_pivote, col_pivote)
-            self.iteraciones += 1
-
-            # Guardar iteración
-            self.historial_tablas.append({
-                'iteracion': self.iteraciones,
-                'tabla': self._crear_dataframe_tabla(),
-                'base': self.base.copy(),
-                'variable_entra': var_entra,
-                'variable_sale': var_sale,
-                'elemento_pivote': elemento_pivote,
-                'posicion_pivote': f"[{fila_pivote + 1}, {col_pivote + 1}]"
-            })
-
-        if self.es_optimo or self.es_no_acotado:
-            self._extraer_solucion()
-
-        restricciones_violadas = self._verificar_restricciones()
-        if restricciones_violadas:
-            self.es_infactible = True
-
-        return self._generar_resultado(violaciones=restricciones_violadas)
-
-    def _generar_resultado(self, violaciones: List[str] = None) -> Dict:
-        """Genera el resultado final con detalles de restricciones violadas."""
+    def _generar_resultado(self) -> Dict:
+        """Genera el resultado final"""
         solucion_dict = {}
         for i in range(self.n):
             solucion_dict[self.nombres_vars[i]] = float(self.solucion[i])
@@ -421,7 +405,7 @@ class GranM:
             estado = "ERROR"
 
         return {
-            'exito': self.es_optimo,
+            'exito': self.es_optimo and not self.es_infactible,
             'es_no_acotado': self.es_no_acotado,
             'es_infactible': self.es_infactible,
             'valor_optimo': float(self.valor_optimo) if self.valor_optimo is not None else None,
@@ -433,7 +417,6 @@ class GranM:
             'tipo_optimizacion': self.tipo,
             'metodo': 'Gran M',
             'estado': estado,
-            'violaciones': violaciones,
             'historial_tablas': self.historial_tablas
         }
 
