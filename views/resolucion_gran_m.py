@@ -4,16 +4,24 @@ from models.programacion_lineal.gran_m import GranM
 
 
 def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
-    """Muestra la resolución completa del Gran M"""
+    """Muestra la resolución completa del Gran M con diagnóstico extendido."""
+
+    if resultado['es_infactible']:
+        st.error("❌ Problema Infactible - Violación en restricciones:")
+        if 'violaciones' in resultado:
+            for violacion in resultado['violaciones']:
+                st.markdown(f"- {violacion}")
+        return
+
+    if resultado['es_no_acotado']:
+        st.warning("⚠️ Problema No Acotado - La solución puede crecer indefinidamente.")
+        return
 
     if resultado['exito']:
         st.success("✅ Solución Óptima Encontrada")
-    elif resultado['es_no_acotado']:
-        st.warning("⚠️ Problema No Acotado")
-    elif resultado['es_infactible']:
-        st.error("❌ Problema Infactible")
     else:
-        st.error("❌ Error en la resolución")
+        st.error("❌ Error en la resolución del problema")
+        return
 
     # MOSTRAR CONFIGURACIÓN
     st.write("---")
@@ -132,7 +140,6 @@ def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
         - Variables Básicas: {', '.join([x for x in resultado.get('base_final', []) if x.startswith('x')])}
         - Estado: {resultado.get('estado', 'N/A')}
         """)
-
 
 def ejemplo_gran_m_coca_cola():
     """Ejemplo real de Coca-Cola - Minimización de Costos de Distribución"""

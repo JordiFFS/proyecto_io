@@ -110,7 +110,7 @@ class GranM:
         for idx in indices_vars_artificiales:
             posicion_en_nuevos = idx - n_original
             if posicion_en_nuevos >= 0 and posicion_en_nuevos < len(nuevos_coefs):
-                nuevos_coefs[posicion_en_nuevos] = -self.M
+                nuevos_coefs[posicion_en_nuevos] = self.M if self.tipo == "max" else -self.M
 
         self.c = np.concatenate([self.c, nuevos_coefs])
         self.var_artificiales_indices = indices_vars_artificiales
@@ -123,30 +123,33 @@ class GranM:
         return tabla
 
     def _encontrar_columna_pivote(self) -> int:
-        """Encuentra la columna pivote (variable que entra en base)"""
+        """Encuentra la columna pivote (variable que entra en la base)"""
         fila_costo = self.tabla_simplex[-1, :-1]
-        col_negativas = np.where(fila_costo < -1e-10)[0]
+        if self.tipo == "max":
+            col_candidatas = np.where(fila_costo < -1e-10)[0]  # Menos negativo
+        else:  # Para minimización, busca el valor más positivo
+            col_candidatas = np.where(fila_costo > 1e-10)[0]
 
-        if len(col_negativas) == 0:
-            return -1
+        if len(col_candidatas) == 0:
+            return -1  # No hay columnas que mejoren la solución
 
-        return col_negativas[np.argmin(fila_costo[col_negativas])]
+        return col_candidatas[np.argmax(np.abs(fila_costo[col_candidatas]))]
 
     def _encontrar_fila_pivote(self, col_pivote: int) -> int:
-        """Encuentra la fila pivote (variable que sale de base)"""
+        """Encuentra la fila pivote (variable que sale de la base)"""
         col = self.tabla_simplex[:-1, col_pivote]
-        b_vals = self.tabla_simplex[:-1, -1]
+        b_vals = self.tabla_simplex[:-1, -1]  # RHS
 
         razones = []
         for i in range(len(col)):
-            if col[i] > 1e-10:
-                razon = b_vals[i] / col[i]
+            if col[i] > 1e-10:  # Evitar divisiones por valores muy pequeños
+                razon = b_vals[i] / col[i]  # Ratio prueba
                 razones.append((razon, i))
 
-        if not razones:
+        if not razones:  # Si no hay razones válidas, no hay pivote
             return -1
 
-        return min(razones)[1]
+        return min(razones)[1]  # Devuelve el índice de la razón mínima
 
     def _pivotear(self, fila_pivote: int, col_pivote: int):
         """Realiza la operación de pivoteo"""
@@ -252,9 +255,11 @@ class GranM:
         if self.es_optimo or self.es_no_acotado:
             self._extraer_solucion()
 
-        if self.es_optimo and self._verificar_infactibilidad():
+        if self._verificar_infactibilidad():
             self.es_infactible = True
-            self.es_optimo = False
+        else:
+            # Si las artificiales están en la base con valor 0, se eliminan
+            self.base = [var for var in self.base if var not in self.var_artificiales_indices]
 
         return self._generar_resultado()
 
@@ -273,8 +278,98 @@ class GranM:
         else:
             self.valor_optimo = valor
 
-    def _generar_resultado(self) -> Dict:
-        """Genera el resultado final"""
+    def _verificar_restricciones(self) -> List[str]:
+        """Verifica si las restricciones de la solución final son válidas."""
+        violaciones = []
+        for i in range(len(self.A_original)):
+            lhs = sum(self.A_original[i][j] * self.solucion[j] for j in range(self.n))
+            signo = self.signos[i]
+            rhs = self.b_original[i]
+
+            # Consultar si se viola alguna restricción
+            if signo == "<=" and lhs > rhs + 1e-6:
+                violaciones.append(f"Restricción {i + 1}: {lhs:.2f} NO cumple ≤ {rhs:.2f}")
+            elif signo == ">=" and lhs < rhs - 1e-6:
+                violaciones.append(f"Restricción {i + 1}: {lhs:.2f} NO cumple ≥ {rhs:.2f}")
+            elif signo == "=" and abs(lhs - rhs) > 1e-6:
+                violaciones.append(f"Restricción {i + 1}: {lhs:.2f} NO cumple = {rhs:.2f}")
+        return violaciones
+
+    def resolver(self, verbose: bool = False) -> Dict:
+        """Resuelve el problema usando el Método de Gran M, con detección de restricciones infactibles."""
+        self._preparar_problema()
+        self.tabla_simplex = self._construir_tabla_inicial()
+
+        # Inicializar base
+        self.base = []
+        col_actual = self.n
+
+        for i in range(self.m):
+            if self.signos[i] == "<=":
+                self.base.append(col_actual)
+                col_actual += 1
+            elif self.signos[i] == ">=" or self.signos[i] == "=":
+                if self.signos[i] == ">=":
+                    col_actual += 1
+                self.base.append(col_actual)
+                col_actual += 1
+
+        # Guardar tabla inicial
+        self.historial_tablas.append({
+            'iteracion': 0,
+            'tabla': self._crear_dataframe_tabla(),
+            'base': self.base.copy(),
+            'variable_entra': None,
+            'variable_sale': None,
+            'elemento_pivote': None,
+            'posicion_pivote': None
+        })
+
+        max_iteraciones = 1000
+
+        while self.iteraciones < max_iteraciones:
+            col_pivote = self._encontrar_columna_pivote()
+
+            if col_pivote == -1:
+                self.es_optimo = True
+                break
+
+            fila_pivote = self._encontrar_fila_pivote(col_pivote)
+
+            if fila_pivote == -1:
+                self.es_no_acotado = True
+                break
+
+            var_entra = self.mapeo_columnas.get(col_pivote, f"var{col_pivote}")
+            var_sale = self.mapeo_columnas.get(self.base[fila_pivote], f"var{self.base[fila_pivote]}")
+            elemento_pivote = float(self.tabla_simplex[fila_pivote, col_pivote])
+
+            self.base[fila_pivote] = col_pivote
+            self._pivotear(fila_pivote, col_pivote)
+            self.iteraciones += 1
+
+            # Guardar iteración
+            self.historial_tablas.append({
+                'iteracion': self.iteraciones,
+                'tabla': self._crear_dataframe_tabla(),
+                'base': self.base.copy(),
+                'variable_entra': var_entra,
+                'variable_sale': var_sale,
+                'elemento_pivote': elemento_pivote,
+                'posicion_pivote': f"[{fila_pivote + 1}, {col_pivote + 1}]"
+            })
+
+        if self.es_optimo or self.es_no_acotado:
+            self._extraer_solucion()
+
+        restricciones_violadas = self._verificar_restricciones()
+        if restricciones_violadas:
+            self.es_infactible = True
+
+        return self._generar_resultado(violaciones=restricciones_violadas)
+
+    def _generar_resultado(self, violaciones: List[str] = None) -> Dict:
+        """Genera el resultado final con detalles de restricciones violadas."""
         solucion_dict = {}
         for i in range(self.n):
             solucion_dict[self.nombres_vars[i]] = float(self.solucion[i])
@@ -338,6 +433,7 @@ class GranM:
             'tipo_optimizacion': self.tipo,
             'metodo': 'Gran M',
             'estado': estado,
+            'violaciones': violaciones,
             'historial_tablas': self.historial_tablas
         }
 

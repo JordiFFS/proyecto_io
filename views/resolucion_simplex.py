@@ -7,6 +7,8 @@ from models.programacion_lineal.gran_m import GranM
 from models.programacion_lineal.dos_fases import DosFases
 from models.programacion_lineal.dual import Dual
 
+from views.resolucion_gran_m import mostrar_resolucion_gran_m
+
 
 def mostrar_resolucion_simplex(resultado, tabla_final, nombres, A, b, signos, n_vars, n_rest, tipo_opt, metodo_usado):
     """
@@ -278,23 +280,60 @@ def mostrar_ejemplos(metodo):
 
                 st.dataframe(simplex.obtener_tabla_pandas(), use_container_width=True)
 
-    elif metodo == "gran_m":
-        st.subheader("Ejemplo Gran M")
-        st.write("min: 2x₁ + 3x₂")
-        st.write("s.a: x₁ + x₂ ≥ 5")
-        st.write("     x₁ ≥ 2")
-        st.write("     x₂ ≥ 1")
 
-        if st.button("Ejecutar", key="ej_granm"):
-            gran_m = GranM([2, 3], [[1, 1], [1, 0], [0, 1]], [5, 2, 1], [">=", ">=", ">="], tipo="min",
-                           nombres_vars=["x1", "x2"])
+    elif metodo == "gran_m":
+        st.subheader("📊 Ejemplo: Minimización de Costos - Método Gran M")
+        st.write("""
+        **Problema:** Minimizar costos de distribución desde plantas a centros de distribución.
+        
+        **Variables:**
+        - x₁ = Botellas desde Planta Quito a Centro Quito
+        - x₂ = Botellas desde Planta Quito a Centro Guayaquil
+        - x₃ = Botellas desde Planta Guayaquil a Centro Cuenca
+        
+        **Función Objetivo:**
+        Minimizar: 0.05x₁ + 0.15x₂ + 0.12x₃
+        
+        **Restricciones:**
+        - Capacidad Planta Quito: x₁ + x₂ ≤ 1,500,000
+        - Capacidad Planta Guayaquil: x₃ ≥ 400,000
+        - Demanda Centro Quito: x₁ ≥ 300,000
+        - Demanda Centro Guayaquil: x₂ ≥ 200,000
+        - Demanda Centro Cuenca: x₃ ≤ 500,000
+        """)
+        if st.button("Ejecutar Ejemplo Gran M", key="ej_granm"):
+            # Definir los parámetros del problema
+            c = [0.05, 0.15, 0.12]
+            A = [
+                [1, 1, 0],  # Capacidad Planta Quito
+                [0, 0, 1],  # Capacidad Planta Guayaquil
+                [1, 0, 0],  # Demanda Centro Quito
+                [0, 1, 0],  # Demanda Centro Guayaquil
+                [0, 0, 1],  # Demanda Centro Cuenca
+            ]
+            b = [1500000, 400000, 300000, 200000, 500000]
+            signos = ["<=", ">=", ">=", ">=", "<="]
+            gran_m = GranM(
+                c, A, b, signos,
+                tipo="min",
+                nombres_vars=["Quito→Quito", "Quito→Guayaquil", "Guayaquil→Cuenca"]
+            )
+
             resultado = gran_m.resolver(verbose=False)
 
-            st.metric("Z", f"{resultado['valor_optimo']:.4f}")
-            st.metric("x₁", f"{resultado['solucion_variables']['x1']:.4f}")
-            st.metric("x₂", f"{resultado['solucion_variables']['x2']:.4f}")
-
-            st.dataframe(gran_m.obtener_tabla_pandas(), use_container_width=True)
+            if resultado['exito']:
+                st.success("✅ Solución óptima encontrada")
+                mostrar_resolucion_gran_m(
+                    resultado,
+                    ["Quito→Quito", "Quito→Guayaquil", "Guayaquil→Cuenca"],
+                    3, 5, "Minimización"
+                )
+            elif resultado['es_infactible']:
+                st.error("❌ Problema Infactible - No existe solución que satisfaga todas las restricciones")
+            elif resultado['es_no_acotado']:
+                st.warning("⚠️ Problema No Acotado - La solución puede mejorar indefinidamente")
+            else:
+                st.error("❌ Error en la resolución")
 
     elif metodo == "dos_fases":
         st.subheader("Ejemplo Dos Fases")
