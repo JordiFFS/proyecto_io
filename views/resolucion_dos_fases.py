@@ -3,6 +3,85 @@ import pandas as pd
 from models.programacion_lineal.dos_fases import DosFases
 
 
+def ejemplo_dos_fases_coca_cola():
+    """Ejemplo real de Coca-Cola - Minimización de Costos de Distribución"""
+    st.subheader("📊 Ejemplo: Minimización de Costos - Coca-Cola")
+
+    st.write("""
+    **Problema:** Minimizar costos de distribución desde plantas a centros
+
+    **Variables:**
+    - x₁ = Botellas desde Planta Quito a Centro Quito
+    - x₂ = Botellas desde Planta Quito a Centro Guayaquil
+    - x₃ = Botellas desde Planta Guayaquil a Centro Cuenca
+
+    **Función Objetivo:**
+    Minimizar: 0.05x₁ + 0.15x₂ + 0.12x₃
+
+    **Restricciones:**
+    - x₁ + x₂ ≤ 1,500,000 (Capacidad Planta Quito)
+    - x₃ ≥ 0 (No negatividad)
+    - x₁ ≥ 300,000 (Demanda mínima Centro Quito)
+    - x₂ ≥ 200,000 (Demanda mínima Centro Guayaquil)
+    - x₃ ≤ 500,000 (Capacidad máxima Centro Cuenca)
+
+    """)
+
+    if st.button("Ejecutar Ejemplo Dos Fases (Coca-Cola)", key="ej_dos_fases_coca"):
+        c = [0.05, 0.15, 0.12]
+        A = [
+            [1, 1, 0],  # x₁ + x₂ ≤ 1,500,000
+            [0, 0, 1],  # x₃ ≥ 0 (esto es -x₃ ≤ 0)
+            [1, 0, 0],  # x₁ ≥ 300,000
+            [0, 1, 0],  # x₂ ≥ 200,000
+            [0, 0, 1],  # x₃ ≤ 500,000
+        ]
+
+        b = [1500000, 0, 300000, 200000, 500000]
+        signos = ["<=", ">=", ">=", ">=", "<="]
+
+        dos_fases = DosFases(
+            c, A, b, signos,
+            tipo="min",
+            nombres_vars=["Quito→Quito", "Quito→Guayaquil", "Guayaquil→Cuenca"]
+        )
+
+        resultado = dos_fases.resolver(verbose=False)
+
+        if resultado['exito']:
+            st.success("✅ Solución óptima encontrada")
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Quito→Quito",
+                          f"{resultado['solucion_variables']['Quito→Quito']:,.0f} botellas")
+            with col2:
+                st.metric("Quito→Guayaquil",
+                          f"{resultado['solucion_variables']['Quito→Guayaquil']:,.0f} botellas")
+            with col3:
+                st.metric("Guayaquil→Cuenca",
+                          f"{resultado['solucion_variables']['Guayaquil→Cuenca']:,.0f} botellas")
+
+            st.metric("💰 Costo Total Mínimo",
+                      f"${resultado['valor_optimo']:,.2f}")
+
+            st.write("---")
+            st.dataframe(dos_fases.obtener_tabla_fase2_pandas(), use_container_width=True)
+
+            st.write("---")
+            mostrar_resolucion_dos_fases(
+                resultado,
+                ["Quito→Quito", "Quito→Guayaquil", "Guayaquil→Cuenca"],
+                3, 5, "Minimización"
+            )
+        elif resultado['es_infactible']:
+            st.error("❌ Problema Infactible")
+        elif resultado['es_no_acotado']:
+            st.warning("⚠️ Problema No Acotado")
+        else:
+            st.error("❌ Error en la resolución")
+
+
 def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
     """Muestra la resolución completa del método Dos Fases"""
 
@@ -113,7 +192,7 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        valor_display = f"{resultado['valor_optimo']:.6f}" if resultado['valor_optimo'] is not None else "N/A"
+        valor_display = f"${resultado['valor_optimo']:,.2f}" if resultado['valor_optimo'] is not None else "N/A"
         st.metric("🎯 Valor Óptimo (Z)", valor_display)
     with col2:
         st.metric("📊 Total Iteraciones", resultado['iteraciones'])
@@ -129,8 +208,8 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
         valor = resultado['solucion_variables'].get(var, 0)
         var_data.append({
             'Variable': var,
-            'Valor Óptimo': f"{valor:.6f}",
-            'Tipo': 'Básica' if valor > 1e-6 else 'No Básica'
+            'Valor Óptimo': f"{valor:,.0f}",
+            'Tipo': 'Básica (Activa)' if valor > 1e-6 else 'No Básica (Inactiva)'
         })
 
     var_df = pd.DataFrame(var_data)
@@ -152,7 +231,8 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
         """)
 
     with summary_col2:
-        valor_display = f"{resultado['valor_optimo']:.6f}" if resultado['valor_optimo'] is not None else "No encontrado"
+        valor_display = f"${resultado['valor_optimo']:,.2f}" if resultado[
+                                                                    'valor_optimo'] is not None else "No encontrado"
         st.write(f"""
         **Solución:**
         - Valor Óptimo Z = {valor_display}

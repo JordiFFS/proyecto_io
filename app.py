@@ -1,7 +1,6 @@
 import streamlit as st
 from views import (
     show_programacion_lineal,
-    show_dualidad,
     show_inventarios,
     show_historial,
     show_redes,
@@ -96,7 +95,6 @@ menu_principal = st.sidebar.radio(
     "Selecciona una opción:",
     ["🏠 Inicio - Caso Empresarial",
      "📈 Programación Lineal",
-     "🔀 Análisis de Dualidad",
      "🌐 Problemas de Redes",
      "🚚 Problema de Transporte",
      "📦 Gestión de Inventarios",
@@ -109,9 +107,6 @@ if menu_principal == "🏠 Inicio - Caso Empresarial":
 
 elif menu_principal == "📈 Programación Lineal":
     show_programacion_lineal()
-
-elif menu_principal == "🔀 Análisis de Dualidad":
-    show_dualidad()
 
 elif menu_principal == "🌐 Problemas de Redes":
     show_redes()

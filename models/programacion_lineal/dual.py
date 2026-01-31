@@ -102,15 +102,19 @@ class Dual:
             resultado = dos_fases.resolver(verbose=False)
 
             if resultado['exito']:
+                # IMPORTANTE: DosFases ya retorna el valor correcto
+                # NO modificar, usar directamente
+                z_optimo = resultado['valor_optimo']
+
                 print(f"✓ Óptimo encontrado")
-                print(f"  Z = {resultado['valor_optimo']}")
+                print(f"  Z = {z_optimo}")
 
                 valores = [resultado['solucion_variables'].get(n, 0.0) for n in nombres]
                 print(f"  Solución: {dict(zip(nombres, valores))}")
                 print(f"  Iteraciones Fase 1: {resultado['iteraciones_fase1']}")
                 print(f"  Iteraciones Fase 2: {resultado['iteraciones_fase2']}")
 
-                return True, np.array(valores), resultado['valor_optimo']
+                return True, np.array(valores), z_optimo
             else:
                 print(f"✗ {resultado['estado']}")
                 print(f"  Infactible: {resultado['es_infactible']}")

@@ -7,8 +7,8 @@ from models.programacion_lineal.dos_fases import DosFases
 from models.programacion_lineal.dual import Dual
 from .resolucion_simplex import mostrar_resolucion_simplex, mostrar_ejemplos
 from .resolucion_gran_m import mostrar_resolucion_gran_m, ejemplo_gran_m_coca_cola
-from .resolucion_dos_fases import mostrar_resolucion_dos_fases
-from .resolucion_dual import mostrar_resolucion_dual
+from .resolucion_dos_fases import mostrar_resolucion_dos_fases, ejemplo_dos_fases_coca_cola
+from .resolucion_dual_con_ejemplo import mostrar_resolucion_dual, ejemplo_dual_coca_cola
 
 
 def show_programacion_lineal():
@@ -208,5 +208,9 @@ def show_programacion_lineal():
     with tab2:
         if metodo == "gran_m":
             ejemplo_gran_m_coca_cola()
+        elif metodo == "dos_fases":
+            ejemplo_dos_fases_coca_cola()
+        elif metodo == "dual":
+            ejemplo_dual_coca_cola()
         else:
             mostrar_ejemplos(metodo)
