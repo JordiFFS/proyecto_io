@@ -1,3 +1,5 @@
+# views/resolucion_simplex.py
+
 import streamlit as st
 import pandas as pd
 from models.programacion_lineal.simplex import Simplex
@@ -125,7 +127,7 @@ def mostrar_resolucion_simplex(resultado, tabla_final, nombres, A, b, signos, n_
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("🎯 Valor Óptimo (Z)", f"{resultado['valor_optimo']:.6f}")
+        st.metric("🎯 Valor Óptimo (Z)", f"${resultado['valor_optimo']:.2f}")
     with col2:
         st.metric("🔄 Iteraciones", resultado['iteraciones'])
     with col3:
@@ -225,20 +227,56 @@ def mostrar_ejemplos(metodo):
     """
 
     if metodo == "simplex":
-        st.subheader("Ejemplo Simplex")
-        st.write("max: 3x₁ + 2x₂")
-        st.write("s.a: x₁ + x₂ ≤ 10")
-        st.write("     2x₁ + x₂ ≤ 15")
+        st.subheader("Ejemplo Simplex - Planificación de Producción Coca-Cola")
+        st.write("""
+        **Problema:** Maximizar ganancias de producción respetando capacidades de plantas y demanda
+
+        **Variables:**
+        - x₁ = Botellas Coca-Cola a producir
+        - x₂ = Botellas Sprite a producir
+        - x₃ = Botellas Fanta a producir
+
+        **Función Objetivo:**
+        Maximizar: 0.65x₁ + 0.60x₂ + 0.60x₃ (ganancias en $)
+
+        **Restricciones:**
+        - Capacidad Planta Quito: x₁ + x₂ + x₃ ≤ 1,500,000
+        - Capacidad Planta Guayaquil: x₁ + x₂ + x₃ ≤ 1,350,000
+        - Capacidad Planta Cuenca: x₁ + x₂ + x₃ ≤ 900,000
+        - Demanda Coca-Cola: x₁ ≥ 450,000
+        - Demanda Sprite: x₂ ≥ 300,000
+        - Demanda Fanta: x₃ ≥ 360,000
+        """)
 
         if st.button("Ejecutar", key="ej_simplex"):
-            simplex = Simplex([3, 2], [[1, 1], [2, 1]], [10, 15], tipo="max", nombres_vars=["x1", "x2"])
+            c = [0.65, 0.60, 0.60]
+            A = [
+                [1, 1, 1],
+                [1, 1, 1],
+                [1, 1, 1],
+                [1, 0, 0],
+                [0, 1, 0],
+                [0, 0, 1],
+            ]
+            b = [1500000, 1350000, 900000, 450000, 300000, 360000]
+            signos = ["<=", "<=", "<=", ">=", ">=", ">="]
+
+            simplex = Simplex(c, A, b, tipo="max",
+                              nombres_vars=["Coca-Cola", "Sprite", "Fanta"])
             resultado = simplex.resolver(verbose=False)
 
-            st.metric("Z", f"{resultado['valor_optimo']:.4f}")
-            st.metric("x₁", f"{resultado['solucion_variables']['x1']:.4f}")
-            st.metric("x₂", f"{resultado['solucion_variables']['x2']:.4f}")
+            if resultado['exito']:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Coca-Cola", f"{resultado['solucion_variables']['Coca-Cola']:,.0f} botellas")
+                with col2:
+                    st.metric("Sprite", f"{resultado['solucion_variables']['Sprite']:,.0f} botellas")
+                with col3:
+                    st.metric("Fanta", f"{resultado['solucion_variables']['Fanta']:,.0f} botellas")
 
-            st.dataframe(simplex.obtener_tabla_pandas(), use_container_width=True)
+                st.metric("💰 Ganancia Máxima", f"${resultado['valor_optimo']:,.2f}")
+
+                st.dataframe(simplex.obtener_tabla_pandas(), use_container_width=True)
 
     elif metodo == "gran_m":
         st.subheader("Ejemplo Gran M")

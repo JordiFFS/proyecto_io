@@ -1,6 +1,5 @@
 import streamlit as st
 from views import (
-    show_inicio,
     show_programacion_lineal,
     show_dualidad,
     show_inventarios,
@@ -8,11 +7,12 @@ from views import (
     show_redes,
     show_transporte
 )
+from views.inicio_caso_empresarial import show_inicio_caso_empresarial
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Sistema de Optimización Empresarial",
-    page_icon="📊",
+    page_title="Sistema de Optimización Empresarial - Coca-Cola",
+    page_icon="🏭",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -49,7 +49,7 @@ st.markdown("""
         border-radius: 5px;
     }
     .info-box {
-        background-color: #d1ecf1;
+        background-color: #000000;
         border-left: 5px solid #17a2b8;
         padding: 1rem;
         border-radius: 5px;
@@ -87,14 +87,14 @@ if 'metodo_transp' not in st.session_state:
     st.session_state.metodo_transp = None
 
 # Header principal
-st.markdown("<h1 class='main-header'>🎯 Sistema de Optimización Empresarial</h1>", unsafe_allow_html=True)
-st.markdown("*Investigación Operativa - Análisis y Optimización de Procesos Empresariales*")
+st.markdown("<h1 class='main-header'>🏭 Sistema de Optimización Empresarial</h1>", unsafe_allow_html=True)
+st.markdown("*Coca-Cola Embotelladora Nacional - Análisis Integral de Optimización*")
 
 # Sidebar para navegación
 st.sidebar.title("📋 Menú Principal")
 menu_principal = st.sidebar.radio(
     "Selecciona una opción:",
-    ["🏠 Inicio",
+    ["🏠 Inicio - Caso Empresarial",
      "📈 Programación Lineal",
      "🔀 Análisis de Dualidad",
      "🌐 Problemas de Redes",
@@ -104,8 +104,8 @@ menu_principal = st.sidebar.radio(
 )
 
 # Mostrar la vista correspondiente según el menú seleccionado
-if menu_principal == "🏠 Inicio":
-    show_inicio()
+if menu_principal == "🏠 Inicio - Caso Empresarial":
+    show_inicio_caso_empresarial()
 
 elif menu_principal == "📈 Programación Lineal":
     show_programacion_lineal()
@@ -130,8 +130,10 @@ st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: gray; font-size: 0.8rem;'>
     <p>Sistema de Optimización Empresarial - Investigación Operativa</p>
+    <p>Caso de Estudio: Coca-Cola Embotelladora Nacional</p>
     <p>Implementación desde Cero - Sin Librerías de Optimización</p>
-    <p>Métodos: Simplex | Gran M | Dos Fases | Dualidad | Redes | Transporte</p>
+    <p>Métodos: Simplex | Gran M | Dos Fases | Dualidad | Redes | Transporte | Inventarios</p>
     <p>✨ Con visualización detallada de TODOS los pasos de cada algoritmo</p>
+    <p>🤖 Análisis de Sensibilidad con Inteligencia Artificial</p>
 </div>
 """, unsafe_allow_html=True)

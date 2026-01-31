@@ -4,14 +4,6 @@ import pandas as pd
 
 
 class Simplex:
-    """
-    Implementación del Método Simplex con visualización detallada de cada paso.
-    Resuelve problemas de la forma:
-    max/min: c^T * x
-    s.a: A * x <= b
-         x >= 0
-    """
-
     def __init__(self, c: List[float], A: List[List[float]], b: List[float],
                  tipo: str = "max", nombres_vars: List[str] = None):
         """
@@ -378,22 +370,3 @@ class Simplex:
         if self.tabla_simplex is None:
             return None
         return self._crear_dataframe_tabla(self.tabla_simplex)
-
-
-if __name__ == "__main__":
-    print("Prueba SimplexDetallado")
-    c = [5, 4]
-    A = [[6, 4], [1, 2], [0, 1], [-1, 1]]
-    b = [24, 6, 2, 1]
-
-    simplex = SimplexDetallado(c, A, b, tipo="max", nombres_vars=["x1", "x2"])
-    resultado = simplex.resolver(verbose=True)
-
-    print("\n" + "=" * 80)
-    print("RESULTADO FINAL")
-    print("=" * 80)
-    print(f"Valor Óptimo: {resultado['valor_optimo']:.4f}")
-    print(f"Iteraciones: {resultado['iteraciones']}")
-    print(f"\nSolución:")
-    for var, val in resultado['solucion_variables'].items():
-        print(f"  {var} = {val:.4f}")

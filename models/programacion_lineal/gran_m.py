@@ -4,10 +4,6 @@ import pandas as pd
 
 
 class GranM:
-    """
-    Implementación del Método de Gran M para Programación Lineal con historial detallado
-    """
-
     def __init__(self, c: List[float], A: List[List[float]], b: List[float],
                  signos: List[str], tipo: str = "max",
                  nombres_vars: List[str] = None, M: float = 1e6):
