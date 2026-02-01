@@ -1,3 +1,8 @@
+"""
+models/transporte/costo_minimo.py
+Modelo de Costo Mínimo adaptado para Coca-Cola
+"""
+
 import numpy as np
 import copy
 

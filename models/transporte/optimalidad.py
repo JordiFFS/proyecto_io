@@ -1,4 +1,5 @@
 """
+models/transporte/optimalidad.py
 Módulo: Prueba de Optimalidad (MODI + Stepping Stone)
 Descripción: Implementación del método MODI (Modified Distribution) y Stepping Stone
              para verificar y mejorar la solución inicial del problema de transporte.
@@ -95,9 +96,16 @@ class OptimizadorTransporte:
                     )
                     cambios = True
 
-        # Verificar que todos los potenciales fueron calculados
-        if None in u or None in v:
-            explicaciones.append("\n⚠️ Advertencia: No se pudieron calcular todos los potenciales")
+        # Asignar 0 a los potenciales que siguen siendo None (casos degenerados)
+        for i in range(len(u)):
+            if u[i] is None:
+                u[i] = 0
+                explicaciones.append(f"  u_{i + 1} = 0 (asignado por degeneración)")
+
+        for j in range(len(v)):
+            if v[j] is None:
+                v[j] = 0
+                explicaciones.append(f"  v_{j + 1} = 0 (asignado por degeneración)")
 
         explicacion_completa = "\n".join(explicaciones)
 

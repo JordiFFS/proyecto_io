@@ -1,3 +1,9 @@
+"""
+models/transporte/vogel.py
+Método de Vogel adaptado para Coca-Cola
+"""
+
+
 class MetodoVogel:
     def __init__(self, costos, oferta, demanda):
         self.costos = costos
@@ -85,7 +91,7 @@ class MetodoVogel:
             paso_info[
                 "asignacion"] = f"✏️ Asignamos {qty} unidades a la celda más barata (F{f_sel + 1}, D{c_sel + 1}) [Costo: {self.costos[f_sel][c_sel]}]"
 
-            # ⭐ AGREGAR INFORMACIÓN DE LA CELDA (CORRECCIÓN DEL ERROR)
+            # ⭐ AGREGAR INFORMACIÓN DE LA CELDA
             paso_info["celda"] = (f_sel, c_sel)
             paso_info["cantidad"] = qty
             paso_info["costo_unitario"] = self.costos[f_sel][c_sel]

@@ -1,13 +1,22 @@
+"""
+views/transporte.py
+Vista principal para Problemas de Transporte adaptada a Coca-Cola
+"""
+
 import streamlit as st
 from views.resolucion_esquina_noroeste import mostrar_resolucion_esquina_noroeste, ejemplo_esquina_noroeste
 from views.resolucion_costo_minimo_transporte import mostrar_resolucion_costo_minimo_transporte, \
     ejemplo_costo_minimo_transporte
 from views.resolucion_vogel import mostrar_resolucion_vogel, ejemplo_vogel
-from views.resolucion_optimalidad import mostrar_resolucion_optimalidad
+from views.resolucion_optimalidad import mostrar_resolucion_optimalidad, ejemplo_optimalidad_transporte
 
 from models.transporte.esquina_noroeste import EsquinaNoreste
 from models.transporte.costo_minimo import CostoMinimo
 from models.transporte.vogel import MetodoVogel
+from empresa.datos_empresa import (
+    PLANTAS, CENTROS_DISTRIBUCION, COSTOS_TRANSPORTE_DISTRIBUCION,
+    PUNTOS_VENTA, COSTOS_TRANSPORTE_VENTA
+)
 
 
 def show_transporte():
@@ -143,17 +152,16 @@ def _mostrar_esquina_noroeste():
             st.error("❌ Dimensiones inconsistentes")
             return
 
-        #if sum(oferta) != sum(demanda):
-        #    st.error("❌ Oferta total ≠ Demanda total")
-        #    return
-
     except Exception as e:
         st.error(f"❌ Error al procesar datos: {str(e)}")
         return
 
     # Botón ejecutar
     if st.button("▶️ Resolver Esquina Noroeste", key="btn_exec_esquina_metodo"):
-        mostrar_resolucion_esquina_noroeste(costos, oferta, demanda)
+        # Generar nombres de orígenes y destinos
+        orígenes = [f"O{i+1}" for i in range(len(oferta))]
+        destinos = [f"D{j+1}" for j in range(len(demanda))]
+        mostrar_resolucion_esquina_noroeste(costos, oferta, demanda, orígenes, destinos)
 
     # Ejemplo
     st.write("---")
@@ -200,16 +208,15 @@ def _mostrar_costo_minimo():
                 fila = [float(x.strip()) for x in linea.replace(',', ' ').split()]
                 costos.append(fila)
 
-        #if sum(oferta) != sum(demanda):
-        #    st.error("❌ Oferta total ≠ Demanda total")
-        #    return
-
     except Exception as e:
         st.error(f"❌ Error al procesar datos: {str(e)}")
         return
 
     if st.button("▶️ Resolver Costo Mínimo", key="btn_exec_costo_minimo_metodo"):
-        mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda)
+        # Generar nombres de orígenes y destinos
+        orígenes = [f"O{i+1}" for i in range(len(oferta))]
+        destinos = [f"D{j+1}" for j in range(len(demanda))]
+        mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígenes, destinos)
 
     st.write("---")
     ejemplo_costo_minimo_transporte()
@@ -255,16 +262,15 @@ def _mostrar_vogel():
                 fila = [float(x.strip()) for x in linea.replace(',', ' ').split()]
                 costos.append(fila)
 
-        #if sum(oferta) != sum(demanda):
-        #    st.error("❌ Oferta total ≠ Demanda total")
-        #    return
-
     except Exception as e:
         st.error(f"❌ Error al procesar datos: {str(e)}")
         return
 
     if st.button("▶️ Resolver Vogel", key="btn_exec_vogel_metodo"):
-        mostrar_resolucion_vogel(costos, oferta, demanda)
+        # Generar nombres de orígenes y destinos
+        orígenes = [f"O{i+1}" for i in range(len(oferta))]
+        destinos = [f"D{j+1}" for j in range(len(demanda))]
+        mostrar_resolucion_vogel(costos, oferta, demanda, orígenes, destinos)
 
     st.write("---")
     ejemplo_vogel()
@@ -322,15 +328,15 @@ def _mostrar_optimizar():
                 fila = [float(x.strip()) for x in linea.replace(',', ' ').split()]
                 costos.append(fila)
 
-        #if sum(oferta) != sum(demanda):
-        #    st.error("❌ Oferta total ≠ Demanda total")
-        #    return
-
     except Exception as e:
         st.error(f"❌ Error al procesar datos: {str(e)}")
         return
 
     if st.button("▶️ Resolver y Optimizar", key="btn_exec_optimizar_metodo_final"):
+        # Generar nombres de orígenes y destinos
+        orígenes = [f"O{i+1}" for i in range(len(oferta))]
+        destinos = [f"D{j+1}" for j in range(len(demanda))]
+
         # Generar solución inicial según método seleccionado
         if metodo_inicial == "Esquina Noroeste":
             metodo = EsquinaNoreste(costos, oferta, demanda)
@@ -350,4 +356,7 @@ def _mostrar_optimizar():
             solucion_inicial = metodo.resolver()
 
         # Optimizar
-        mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, nombre)
+        mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, nombre, orígenes, destinos)
+
+    st.write("---")
+    ejemplo_optimalidad_transporte()

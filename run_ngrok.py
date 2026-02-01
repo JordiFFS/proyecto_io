@@ -1,153 +1,368 @@
-#!/usr/bin/env python3
 """
-Script para ejecutar la aplicación Streamlit con ngrok
-Expone la aplicación localmente y genera una URL pública
+ia/analista.py
+Módulo simplificado para análisis con OpenAI API oficial
+(Sin necesidad de ngrok)
 """
 
-import subprocess
-import time
 import os
-import sys
-from pathlib import Path
+import json
+import streamlit as st
+from typing import Dict, List, Optional
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
+
+try:
+    from openai import OpenAI, APIError, APIConnectionError, RateLimitError
+    OPENAI_DISPONIBLE = True
+except ImportError:
+    OPENAI_DISPONIBLE = False
 
 
-def ejecutar_app_con_ngrok(puerto: int = 8501, token_ngrok: str = None):
+class AnalistaIA:
     """
-    Ejecuta la aplicación Streamlit y la expone con ngrok
-
-    Parámetros:
-    - puerto: puerto en el que ejecutar streamlit (default: 8501)
-    - token_ngrok: token de autenticación de ngrok (opcional)
+    Clase para análisis automático usando OpenAI API oficial
+    Sin necesidad de ngrok ni servidores locales
     """
 
-    # Verificar que ngrok esté disponible
-    try:
-        subprocess.run(['ngrok', '--version'], capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("❌ ngrok no está instalado o no está en PATH")
-        print("\nPara instalar ngrok:")
-        print("  Windows: choco install ngrok")
-        print("  Linux/Mac: brew install ngrok")
-        print("  O descargar desde: https://ngrok.com/download")
-        sys.exit(1)
+    def __init__(self):
+        """Inicializa el cliente de OpenAI"""
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        self.model = os.getenv("OPENAI_MODEL", "gpt-4o")
 
-    # Si se proporciona token, configurar ngrok
-    if token_ngrok:
-        subprocess.run(['ngrok', 'config', 'add-authtoken', token_ngrok])
-        print("✓ Token de ngrok configurado")
+        # Log de diagnóstico
+        self.disponible = False
+        self.cliente = None
+        self.error_msg = ""
 
-    print("\n" + "=" * 80)
-    print("🚀 INICIANDO APLICACIÓN DE INVESTIGACIÓN OPERATIVA")
-    print("=" * 80)
-    print(f"📍 Inicio en: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"🔌 Puerto local: {puerto}")
-    print("\nAbriendo túneles...")
+        if not self.api_key:
+            self.error_msg = "OPENAI_API_KEY no configurada en .env"
+            return
 
-    # Iniciar ngrok en segundo plano
-    ngrok_process = subprocess.Popen(
-        ['ngrok', 'http', str(puerto), '--log=stdout'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
+        if not OPENAI_DISPONIBLE:
+            self.error_msg = "OpenAI no instalada. Ejecuta: pip install openai"
+            return
 
-    # Esperar a que ngrok se inicialice
-    time.sleep(3)
+        try:
+            # Inicializar cliente con OpenAI oficial
+            self.cliente = OpenAI(api_key=self.api_key)
+            self.disponible = True
+            st.session_state.ia_status = "✅ Conectado a OpenAI"
+        except Exception as e:
+            self.error_msg = f"Error al conectar: {str(e)}"
 
-    # Iniciar Streamlit
-    print("\n✓ ngrok iniciado")
-    print("✓ Iniciando Streamlit...\n")
+    def analizar_ejercicio(
+        self,
+        tipo_problema: str,
+        datos_entrada: Dict,
+        resultado: Dict,
+        metadata: Dict = None
+    ) -> str:
+        """
+        Analiza un ejercicio de optimización
+        """
+        if not self.disponible or not self.cliente:
+            return self._analisis_fallback_ejercicio(tipo_problema, resultado)
 
-    streamlit_process = subprocess.Popen(
-        ['streamlit', 'run', 'app.py', f'--server.port={puerto}'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
+        prompt = f"""
+Eres un experto en Investigación de Operaciones e Ingeniería Industrial.
 
-    print(f"✓ Streamlit ejecutándose en: http://localhost:{puerto}")
-    print("\n" + "=" * 80)
-    print("🌐 URL PÚBLICA (ngrok): https://<id>.ngrok.io")
-    print("=" * 80)
-    print("\nPara ver la URL pública:")
-    print("  1. Abre: http://localhost:4040 (panel de ngrok)")
-    print("  2. O busca en los logs de ngrok la URL pública\n")
+Analiza el siguiente ejercicio de optimización:
 
-    try:
-        # Esperar a que alguno de los procesos termine
-        while True:
-            if ngrok_process.poll() is not None:
-                print("\n⚠️ ngrok se ha detenido")
-                break
-            if streamlit_process.poll() is not None:
-                print("\n⚠️ Streamlit se ha detenido")
-                break
-            time.sleep(1)
+**Tipo de Problema:** {tipo_problema}
+**Datos de Entrada:** {json.dumps(datos_entrada, indent=2, default=str)}
+**Resultado Obtenido:** {json.dumps(resultado, indent=2, default=str)}
 
-    except KeyboardInterrupt:
-        print("\n\n📋 Deteniendo aplicación...")
-        streamlit_process.terminate()
-        ngrok_process.terminate()
-        streamlit_process.wait(timeout=5)
-        ngrok_process.wait(timeout=5)
-        print("✓ Aplicación detenida correctamente")
+Por favor proporciona:
+1. **Interpretación del resultado** - Qué significa el valor óptimo obtenido
+2. **Validación de la solución** - ¿Es viable y tiene sentido?
+3. **Conclusiones clave** - Hallazgos más importantes
+4. **Recomendaciones prácticas** - Cómo usar estos resultados
+
+Sé conciso pero informativo (máximo 400 palabras).
+Usa formato markdown con viñetas donde sea apropiado.
+"""
+
+        try:
+            response = self.cliente.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=800,
+                timeout=30
+            )
+            return response.choices[0].message.content
+        except APIConnectionError as e:
+            return f"❌ Error de conexión: {str(e)}. Verifica tu conexión a internet."
+        except RateLimitError:
+            return "⏳ Límite de rate alcanzado. Intenta en unos segundos."
+        except APIError as e:
+            return f"❌ Error de OpenAI: {str(e)}"
+        except Exception as e:
+            return self._analisis_fallback_ejercicio(tipo_problema, resultado)
+
+    def analizar_sensibilidad(
+        self,
+        tipo_problema: str,
+        parametros_sensibles: Dict,
+        resultado_actual: float,
+        restricciones: Dict = None
+    ) -> str:
+        """
+        Realiza análisis de sensibilidad automático
+        """
+        if not self.disponible or not self.cliente:
+            return self._analisis_fallback_sensibilidad(parametros_sensibles)
+
+        prompt = f"""
+Realiza un análisis de sensibilidad detallado para una solución de optimización:
+
+**Tipo de Problema:** {tipo_problema}
+**Valor Óptimo Actual:** {resultado_actual}
+**Parámetros Sensibles:** {json.dumps(parametros_sensibles, indent=2, default=str)}
+{f'**Restricciones:** {json.dumps(restricciones, indent=2, default=str)}' if restricciones else ''}
+
+Por favor proporciona:
+1. **Parámetros Críticos** - Cuáles tienen mayor impacto en la solución
+2. **Rangos de Variabilidad** - Dentro de qué límites puede variar cada parámetro
+3. **Puntos de Quiebre** - Valores críticos donde cambia la solución
+4. **Estrategia de Robustez** - Cómo hacer la solución más resiliente
+
+Sé específico con números y porcentajes (máximo 350 palabras).
+"""
+
+        try:
+            response = self.cliente.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=700,
+                timeout=30
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            return self._analisis_fallback_sensibilidad(parametros_sensibles)
+
+    def generar_resumen_ejecutivo(
+        self,
+        tipo_problema: str,
+        objetivo: str,
+        metricas: Dict,
+        recomendaciones: List[str] = None,
+        contexto_empresa: str = "Coca-Cola"
+    ) -> str:
+        """
+        Genera un resumen ejecutivo profesional
+        """
+        if not self.disponible or not self.cliente:
+            return self._resumen_fallback(metricas, contexto_empresa)
+
+        prompt = f"""
+Genera un resumen ejecutivo profesional para la gerencia de {contexto_empresa}:
+
+**Problema Resuelto:** {tipo_problema}
+**Objetivo:** {objetivo}
+
+**Métricas Clave:**
+{json.dumps(metricas, indent=2, default=str)}
+
+{f'**Recomendaciones:** {", ".join(recomendaciones)}' if recomendaciones else ''}
+
+**Formato solicitado:**
+1. **Situación** (1-2 líneas) - Contexto del problema
+2. **Solución** (3-4 viñetas) - Resultados principales y valor generado
+3. **Impacto** (1-2 líneas) - Beneficio cuantificable para la empresa
+4. **Próximos Pasos** (3-4 viñetas) - Acciones recomendadas
+
+**Estilo:** Ejecutivo, directo, enfocado en valor empresarial. Máximo 250 palabras.
+Usa formato markdown. Incluye métricas cuantitativas cuando sea posible.
+"""
+
+        try:
+            response = self.cliente.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=600,
+                timeout=30
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            return self._resumen_fallback(metricas, contexto_empresa)
+
+    def generar_interpretacion(
+        self,
+        tipo_problema: str,
+        resultado: float,
+        detalles_problema: Dict
+    ) -> str:
+        """
+        Genera una interpretación amigable del resultado
+        """
+        if not self.disponible or not self.cliente:
+            return f"**Resultado óptimo:** {resultado}"
+
+        prompt = f"""
+Proporciona una interpretación amigable de los siguientes resultados de optimización:
+
+**Tipo de Problema:** {tipo_problema}
+**Resultado Óptimo:** {resultado}
+**Detalles:** {json.dumps(detalles_problema, indent=2, default=str)}
+
+Explica qué significa este resultado en términos simples y prácticos.
+¿Qué acción debe tomar el usuario con este resultado?
+Máximo 200 palabras. Tono profesional pero accesible.
+"""
+
+        try:
+            response = self.cliente.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=400,
+                timeout=30
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            return f"**Resultado óptimo obtenido:** {resultado}"
+
+    # Métodos fallback
+    def _analisis_fallback_ejercicio(self, tipo: str, resultado: Dict) -> str:
+        """Análisis fallback sin IA"""
+        costo = resultado.get('costo_total', resultado.get('valor_optimo', resultado.get('distancia_total', 0)))
+        return f"""
+### 📊 Análisis del Ejercicio (Modo Básico)
+
+**Tipo de Problema:** {tipo}
+**Resultado Óptimo:** {costo:.2f}
+
+#### Validación
+✓ La solución ha sido calculada correctamente usando el algoritmo especificado.
+
+#### Recomendaciones
+- Verifica que la solución satisface todas las restricciones
+- Compara con soluciones alternativas si es posible
+- Documenta los hallazgos principales
+
+⚠️ **Nota:** Para análisis con IA, configura tu API key de OpenAI en `.env`
+"""
+
+    def _analisis_fallback_sensibilidad(self, parametros: Dict) -> str:
+        """Análisis de sensibilidad fallback"""
+        return """
+### 🔍 Análisis de Sensibilidad (Modo Básico)
+
+#### Parámetros Identificados
+Se han identificado parámetros clave en el modelo de optimización.
+
+#### Recomendaciones
+- Enfoca atención en los parámetros con mayor variabilidad
+- Establece límites de tolerancia para cada parámetro crítico
+- Monitorea cambios en estos parámetros durante la ejecución
+
+⚠️ **Nota:** Para análisis detallado con IA, configura tu API key en `.env`
+"""
+
+    def _resumen_fallback(self, metricas: Dict, empresa: str = "Coca-Cola") -> str:
+        """Resumen ejecutivo fallback"""
+        metricas_str = "\n".join([f"• **{k}:** {v}" for k, v in list(metricas.items())[:5]])
+        return f"""
+### 📋 Resumen Ejecutivo - {empresa}
+
+#### Resultados Principales
+{metricas_str}
+
+#### Recomendación
+Implementar la solución óptima identificada para maximizar eficiencia operativa.
+
+⚠️ **Nota:** Para resumen ejecutivo con IA, configura tu API key en `.env`
+"""
+
+    def verificar_disponibilidad(self) -> bool:
+        """Verifica si la conexión a OpenAI está disponible"""
+        return self.disponible
+
+    def mostrar_estado_ia(self) -> None:
+        """Muestra el estado de la conexión IA en Streamlit"""
+        if self.disponible:
+            st.success("✅ IA disponible - Análisis automático habilitado")
+        elif self.error_msg:
+            st.warning(f"⚠️ IA no disponible: {self.error_msg}")
+        else:
+            st.info("ℹ️ Análisis con IA deshabilitado")
+
+    def obtener_estado(self) -> Dict:
+        """Retorna estado detallado de la conexión"""
+        return {
+            "disponible": self.disponible,
+            "modelo": self.model,
+            "error": self.error_msg,
+            "api_key_presente": bool(self.api_key)
+        }
 
 
-def ejecutar_app_local():
-    """Ejecuta solo la aplicación Streamlit sin ngrok"""
-    print("\n" + "=" * 80)
-    print("🚀 INICIANDO APLICACIÓN (MODO LOCAL)")
-    print("=" * 80)
-    print("📍 Accede a: http://localhost:8501")
-    print("⏹️  Presiona Ctrl+C para detener\n")
+# Función auxiliar para usar en Streamlit
+def obtener_analista() -> Optional[AnalistaIA]:
+    """
+    Obtiene una instancia del analista IA con caché de Streamlit
+    """
+    @st.cache_resource
+    def _crear_analista():
+        try:
+            analista = AnalistaIA()
+            return analista
+        except Exception as e:
+            return None
 
-    subprocess.run(['streamlit', 'run', 'app.py'])
+    return _crear_analista()
 
 
-if __name__ == "__main__":
-    import argparse
+def mostrar_diagnostico_ia():
+    """Muestra diagnóstico de la conexión IA (para debugging)"""
+    analista = obtener_analista()
 
-    parser = argparse.ArgumentParser(
-        description="Ejecutor de aplicación Streamlit con opciones de ngrok"
-    )
+    if analista:
+        estado = analista.obtener_estado()
 
-    parser.add_argument(
-        '--ngrok',
-        action='store_true',
-        help='Ejecutar con ngrok para acceso público'
-    )
+        st.subheader("🔍 Diagnóstico IA")
 
-    parser.add_argument(
-        '--token',
-        type=str,
-        help='Token de autenticación de ngrok'
-    )
+        col1, col2, col3 = st.columns(3)
 
-    parser.add_argument(
-        '--puerto',
-        type=int,
-        default=8501,
-        help='Puerto para Streamlit (default: 8501)'
-    )
+        with col1:
+            if estado["disponible"]:
+                st.success("✅ Conectado")
+            else:
+                st.error("❌ Desconectado")
 
-    parser.add_argument(
-        '--local',
-        action='store_true',
-        help='Ejecutar solo localmente'
-    )
+        with col2:
+            st.info(f"Modelo: {estado['modelo']}")
 
-    args = parser.parse_args()
+        with col3:
+            if estado["api_key_presente"]:
+                st.success("✅ API Key presente")
+            else:
+                st.warning("⚠️ API Key no configurada")
 
-    # Crear estructura de directorios si no existe
-    Path('models/programacion_lineal').mkdir(parents=True, exist_ok=True)
-    Path('models/transporte').mkdir(parents=True, exist_ok=True)
-    Path('models/redes').mkdir(parents=True, exist_ok=True)
-    Path('models/inventarios').mkdir(parents=True, exist_ok=True)
-    Path('ia').mkdir(parents=True, exist_ok=True)
-    Path('empresa').mkdir(parents=True, exist_ok=True)
-    Path('utils').mkdir(parents=True, exist_ok=True)
-
-    if args.ngrok:
-        ejecutar_app_con_ngrok(puerto=args.puerto, token_ngrok=args.token)
-    else:
-        ejecutar_app_local()
+        if estado["error"]:
+            st.error(f"Error: {estado['error']}")

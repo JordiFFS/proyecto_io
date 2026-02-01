@@ -1,3 +1,8 @@
+"""
+models/transporte/esquina_noroeste.py
+Modelo de Esquina Noroeste adaptado para Coca-Cola
+"""
+
 import numpy as np
 
 
