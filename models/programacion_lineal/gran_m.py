@@ -121,47 +121,32 @@ class GranM:
 
     def _construir_tabla_inicial(self) -> np.ndarray:
         """Construye la tabla inicial del simplex con fila de costos correcta"""
-        print("\n=== CONSTRUYENDO TABLA INICIAL ===")
         tabla = np.hstack([self.A, self.b.reshape(-1, 1)])
 
         # CORRECCIÓN: Calcular fila de costos considerando variables artificiales en la base
         fila_costo = np.concatenate([-self.c, np.zeros(1)])
 
-        print(f"Coeficientes originales (c): {self.c_original}")
-        print(f"Coeficientes después de negación (min→max): {self.c}")
-        print(f"Fila de costos ANTES de ajustar por artificiales (primeros 5): {fila_costo[:5]}")
-
-        # Restar M veces cada fila donde hay una variable artificial en la base inicial
+        # Inicializar base
         base_inicial = []
-        col_idx = self.n
+        col_actual = self.n
         for i in range(self.m):
             if self.signos[i] == "<=":
-                base_inicial.append(col_idx)
-                col_idx += 1
+                base_inicial.append(col_actual)
+                col_actual += 1
             elif self.signos[i] == ">=":
-                col_idx += 1  # exceso
-                base_inicial.append(col_idx)  # artificial
-                col_idx += 1
+                col_actual += 1  # exceso
+                base_inicial.append(col_actual)  # artificial
+                col_actual += 1
             elif self.signos[i] == "=":
-                base_inicial.append(col_idx)  # artificial
-                col_idx += 1
-
-        print(f"Base inicial: {base_inicial}")
-        print(f"Nombres en base: {[self.mapeo_columnas.get(idx, f'var{idx}') for idx in base_inicial]}")
-        print(f"Índices de artificiales: {self.var_artificiales_indices}")
+                base_inicial.append(col_actual)  # artificial
+                col_actual += 1
 
         # Por cada artificial en la base, restar M veces su fila de la fila de costos
         for i, var_base in enumerate(base_inicial):
             if var_base in self.var_artificiales_indices:
-                # Esta es una variable artificial en la base
-                # Restar M veces la fila i de la fila de costos
-                # Nota: self.M es el valor grande, pero ya tiene el signo correcto en self.c
-                costo_penalizacion = self.M  # Siempre positivo para restar correctamente
-                print(f"  Restando {costo_penalizacion:.0f} × fila {i} de la fila de costos")
+                costo_penalizacion = self.M
                 fila_costo[:-1] -= costo_penalizacion * self.A[i, :]
                 fila_costo[-1] -= costo_penalizacion * self.b[i]
-
-        print(f"Fila de costos DESPUÉS de ajustar por artificiales (primeros 5): {fila_costo[:5]}")
 
         tabla = np.vstack([tabla, fila_costo])
         return tabla
@@ -176,15 +161,10 @@ class GranM:
             if fila_costo[i] < -1e-10 and i not in self.var_exceso_indices and i not in self.var_artificiales_indices:
                 col_negativas.append(i)
 
-        print(f"\n[COLUMNA PIVOTE] Fila costos (primeros 5): {fila_costo[:5]}")
-        print(f"[COLUMNA PIVOTE] Negativos válidos: {col_negativas}")
-
         if len(col_negativas) == 0:
-            print("[COLUMNA PIVOTE] NO hay negativos → ÓPTIMO")
             return -1
 
         idx_pivote = col_negativas[np.argmin(fila_costo[col_negativas])]
-        print(f"[COLUMNA PIVOTE] Seleccionada: {idx_pivote} ({self.mapeo_columnas.get(idx_pivote)})")
         return idx_pivote
 
     def _encontrar_fila_pivote(self, col_pivote: int) -> int:
@@ -309,48 +289,83 @@ class GranM:
         return self._generar_resultado()
 
     def _extraer_solucion(self):
-        """Extrae la solución"""
-        print("\n=== EXTRAYENDO SOLUCIÓN ===")
+        """Extrae la solución - CON PRINTS DE DEBUG"""
+        print("\n" + "=" * 80)
+        print("EXTRAYENDO SOLUCIÓN - DEBUG DETALLADO")
+        print("=" * 80)
+
         total_variables = self.A.shape[1]
         self.solucion = np.zeros(total_variables)
 
-        print(f"Base final (índices): {self.base}")
-        print(f"Total variables en tabla: {total_variables}")
-        print(f"Tabla final completa (últimas 2 filas):")
-        print(self.tabla_simplex[-2:])
+        print(f"\nINFORMACIÓN BASE:")
+        print(f"  Total variables en tabla: {total_variables}")
+        print(f"  Número de variables de decisión: {self.n}")
+        print(f"  Base final (índices): {self.base}")
+        print(f"  Base final (nombres): {[self.mapeo_columnas.get(idx) for idx in self.base]}")
 
+        # Mostrar la última fila completa (fila de costos)
+        print(f"\nÚLTIMA FILA DE LA TABLA (Fila de costos):")
+        print(f"  {self.tabla_simplex[-1, :]}")
+        print(f"  Primeros 5 elementos: {self.tabla_simplex[-1, :5]}")
+        print(f"  Último elemento (RHS): {self.tabla_simplex[-1, -1]}")
+
+        # Mostrar cada variable básica
+        print(f"\nVARIABLES BÁSICAS:")
         for i, var_base in enumerate(self.base):
             if var_base < total_variables:
                 valor = self.tabla_simplex[i, -1]
                 self.solucion[var_base] = valor
                 var_nombre = self.mapeo_columnas.get(var_base, f'var{var_base}')
-                print(f"  Fila {i}: {var_nombre} (índice {var_base}) = {valor:.2f}")
-            else:
-                print(f"  ADVERTENCIA: Índice {var_base} >= {total_variables}")
+                print(f"  Fila {i}: {var_nombre:20s} (índice {var_base:2d}) = {valor:12.2f}")
 
-        # El valor en la tabla es -Z para maximización
-        # Si es minimización, ya se convirtió a maximización negando los coeficientes
+        # Mostrar variables no básicas
+        print(f"\nVARIABLES NO BÁSICAS (valor = 0):")
+        for i in range(self.n):
+            if i not in self.base:
+                var_nombre = self.mapeo_columnas.get(i, f'var{i}')
+                print(f"  {var_nombre:20s} (índice {i:2d}) = 0.00")
+
+        # EXTRACCIÓN DEL VALOR ÓPTIMO
+        print(f"\n" + "=" * 80)
+        print("CÁLCULO DEL VALOR ÓPTIMO")
+        print("=" * 80)
+
         valor_tabla = self.tabla_simplex[-1, -1]
+        print(f"\ntabla[-1, -1] (RHS de fila de costos) = {valor_tabla:.6f}")
 
-        print(f"\nValor en tabla (última posición): {valor_tabla:.2f}")
-        print(f"Tipo de optimización: {self.tipo}")
+        print(f"\nTipo de optimización: {self.tipo}")
+        print(f"Coeficientes originales c_original: {self.c_original}")
+        print(f"Coeficientes después de preparación c: {self.c}")
 
-        # En Simplex, la fila de costos es [-c1, -c2, ..., -Z]
-        # Entonces self.tabla_simplex[-1, -1] = -Z
-        # Para obtener Z: Z = -self.tabla_simplex[-1, -1]
+        print(f"\nLÓGICA GRAN M:")
+        print(f"  En Gran M se niega c en preparación para AMBOS MIN y MAX")
+        print(f"  Por lo tanto tabla[-1,-1] siempre = -Z")
+        print(f"  Z = -tabla[-1,-1] = {-valor_tabla:.6f}")
 
-        if self.tipo == "min":
-            # Se convirtió a max negando coeficientes
-            # Entonces valor_tabla = -Z_maximizado = -(-Z_original) = Z_original
-            # Por lo tanto Z_minimizado = -valor_tabla
-            self.valor_optimo = -valor_tabla
-            print(f"Minimización detectada: Z_original = {-valor_tabla:.2f}")
-        else:
-            # Es maximización directa
-            self.valor_optimo = -valor_tabla
-            print(f"Maximización detectada: Z = {-valor_tabla:.2f}")
+        # GRAN M SIEMPRE NIEGA
+        self.valor_optimo = -valor_tabla
 
-        print(f"Valor óptimo final: {self.valor_optimo:.2f}")
+        print(f"\nVALOR ÓPTIMO FINAL: {self.valor_optimo:.6f}")
+
+        # Verificación manual: sumar costos de variables básicas
+        print(f"\n" + "=" * 80)
+        print("VERIFICACIÓN MANUAL DEL VALOR ÓPTIMO")
+        print("=" * 80)
+
+        valor_manual = 0.0
+        print(f"\nSuma de c_original[i] * x[i] para variables básicas:")
+        for i in range(self.n):
+            if self.solucion[i] > 1e-6:
+                contribucion = self.c_original[i] * self.solucion[i]
+                valor_manual += contribucion
+                print(
+                    f"  {self.nombres_vars[i]:20s}: {self.c_original[i]:8.2f} × {self.solucion[i]:12.2f} = {contribucion:12.2f}")
+
+        print(f"\nValor manual calculado: {valor_manual:.6f}")
+        print(f"Valor extraído de tabla: {self.valor_optimo:.6f}")
+        print(f"Diferencia: {abs(valor_manual - self.valor_optimo):.6f}")
+
+        print("=" * 80)
 
     def _generar_resultado(self) -> Dict:
         """Genera el resultado final"""

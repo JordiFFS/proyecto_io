@@ -1,21 +1,144 @@
-# views/resolucion_flujo_maximo.py
+"""
+views/resolucion_flujo_maximo.py
+Vista para Flujo Máximo adaptada a Coca-Cola
+"""
 
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 from models.redes.red import Red
 from models.redes.flujo_maximo import FlujoMaximo
+from empresa.datos_empresa import CENTROS_DISTRIBUCION, PUNTOS_VENTA, COSTOS_TRANSPORTE_VENTA
+
+
+def crear_grafo_flujo(nodos, arcos_flujo, origen, destino):
+    """
+    Crea un gráfico del flujo máximo en la red
+    """
+    fig = go.Figure()
+
+    # Posiciones predefinidas
+    posiciones = {
+        "Centro_Quito": (0, 2),
+        "Centro_Guayaquil": (0, 1),
+        "Centro_Cuenca": (0, 0),
+        "SupermercadoA": (2, 2.2),
+        "SupermercadoB": (2, 0.8),
+        "TiendaDistribuidor1": (2, 2),
+        "TiendaDistribuidor2": (2, 1),
+        "TiendaMinorista1": (2, -0.2),
+        "TiendaMinorista2": (2, 2.4),
+    }
+
+    # Agregar arcos con flujo
+    for (u, v), flujo in arcos_flujo.items():
+        if u in posiciones and v in posiciones and flujo > 0:
+            x0, y0 = posiciones[u]
+            x1, y1 = posiciones[v]
+
+            fig.add_trace(go.Scatter(
+                x=[x0, x1],
+                y=[y0, y1],
+                mode="lines",
+                line=dict(width=3, color="#FF6B6B"),
+                hovertemplate=f"<b>{u} → {v}</b><br>Flujo: {flujo:.2f}<extra></extra>",
+                showlegend=False
+            ))
+
+    colores_nodo = {
+        "Centro_Quito": "#32CD32",
+        "Centro_Guayaquil": "#32CD32",
+        "Centro_Cuenca": "#32CD32",
+        "SupermercadoA": "#FFB84D",
+        "SupermercadoB": "#FFB84D",
+        "TiendaDistribuidor1": "#FFB84D",
+        "TiendaDistribuidor2": "#FFB84D",
+        "TiendaMinorista1": "#FFB84D",
+        "TiendaMinorista2": "#FFB84D",
+    }
+
+    for nodo, (x, y) in posiciones.items():
+        if nodo in nodos:
+            color = colores_nodo.get(nodo, "#808080")
+
+            # Destacar origen y destino
+            tamano = 35 if nodo in [origen, destino] else 25
+            if nodo == origen:
+                borde_color = "#00FF00"
+                borde_ancho = 3
+            elif nodo == destino:
+                borde_color = "#FF0000"
+                borde_ancho = 3
+            else:
+                borde_color = "white"
+                borde_ancho = 1
+
+            fig.add_trace(go.Scatter(
+                x=[x],
+                y=[y],
+                mode="markers+text",
+                marker=dict(
+                    size=tamano,
+                    color=color,
+                    line=dict(width=borde_ancho, color=borde_color)
+                ),
+                text=[nodo],
+                textposition="top center",
+                textfont=dict(size=9, color="white", family="Arial Black"),
+                hovertemplate=f"<b>{nodo}</b><extra></extra>",
+                showlegend=False
+            ))
+
+    fig.update_layout(
+        title=dict(
+            text=f"Flujo Máximo - De {origen} a {destino}",
+            font=dict(size=20, color="white")
+        ),
+        showlegend=True,
+        hovermode="closest",
+        xaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            range=[-0.5, 2.5]
+        ),
+        yaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            range=[-0.5, 2.8]
+        ),
+        plot_bgcolor="#1a1a1a",
+        paper_bgcolor="#0d0d0d",
+        font=dict(color="white"),
+        height=600,
+        margin=dict(b=50, l=50, r=50, t=100)
+    )
+
+    colores_leyenda = [
+        ("Centros Distribución", "#32CD32"),
+        ("Puntos Venta", "#FFB84D"),
+        ("Flujo Activo", "#FF6B6B"),
+        ("Origen", "#00FF00"),
+        ("Destino", "#FF0000")
+    ]
+
+    for nombre, color_ley in colores_leyenda:
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None],
+            mode='markers',
+            marker=dict(size=12, color=color_ley),
+            showlegend=True,
+            name=nombre
+        ))
+
+    return fig
 
 
 def mostrar_resolucion_flujo_maximo(resultado, nodos, origen, destino):
     """
     Muestra la resolución completa del algoritmo de flujo máximo
     usando Ford-Fulkerson con BFS (Edmonds-Karp)
-
-    Args:
-        resultado: Diccionario con resultado del flujo máximo
-        nodos: Lista de nodos de la red
-        origen: Nodo origen
-        destino: Nodo destino
     """
 
     st.success("✅ Flujo Máximo Calculado Exitosamente")
@@ -118,7 +241,22 @@ def mostrar_resolucion_flujo_maximo(resultado, nodos, origen, destino):
         summary_df = pd.DataFrame(summary_data)
         st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
+    # VISUALIZACIÓN GRÁFICA
+    st.write("---")
+    st.markdown("<h2 class='section-header'>🗺️ VISUALIZACIÓN GRÁFICA DEL FLUJO</h2>",
+                unsafe_allow_html=True)
+
+    # Calcular flujos por arco
+    arcos_flujo = {}
+    for iter_info in resultado['iteraciones']:
+        for u, v in iter_info['ruta']:
+            arcos_flujo[(u, v)] = arcos_flujo.get((u, v), 0) + iter_info['flujo_enviado']
+
+    fig_flujo = crear_grafo_flujo(nodos, arcos_flujo, origen, destino)
+    st.plotly_chart(fig_flujo, use_container_width=True)
+
     # VERIFICACIÓN
+    st.write("---")
     st.subheader("✔️ Verificación del Flujo Máximo")
 
     col1, col2, col3 = st.columns(3)
@@ -130,6 +268,7 @@ def mostrar_resolucion_flujo_maximo(resultado, nodos, origen, destino):
         st.metric("Saturados", "✓")
 
     # PROPIEDADES
+    st.write("---")
     st.subheader("⚙️ Propiedades del Algoritmo")
     st.write("""
     - **Algoritmo**: Ford-Fulkerson con BFS (Edmonds-Karp)
@@ -162,37 +301,43 @@ def mostrar_resolucion_flujo_maximo(resultado, nodos, origen, destino):
 
 
 def ejemplo_flujo_maximo():
-    """Ejemplo predefinido de flujo máximo"""
-    st.subheader("Ejemplo: Flujo Máximo en una Red de Tuberías")
+    """Ejemplo de Flujo Máximo con datos de Coca-Cola"""
+    st.subheader("📦 Ejemplo: Flujo Máximo - Red de Distribución Coca-Cola")
     st.write("""
-    **Problema:** Determinar el flujo máximo que puede ir de A a F
-    a través de una red de tuberías con capacidades limitadas.
-
-    **Arcos y capacidades:**
-    - A → B: 10
-    - A → D: 10
-    - B → C: 4
-    - B → E: 8
-    - B → D: 2
-    - C → F: 10
-    - D → E: 9
-    - E → C: 6
-    - E → F: 10
+    **Problema:** Determinar el flujo máximo de botellas que pueden transportarse 
+    desde un Centro de Distribución a los Puntos de Venta.
     """)
 
-    if st.button("Ejecutar Ejemplo", key="ej_flujo_maximo"):
-        flujo = FlujoMaximo(['A', 'B', 'C', 'D', 'E', 'F'])
+    if st.button("Ejecutar Ejemplo Coca-Cola", key="ej_flujo_coca_cola"):
+        # Nodos: centros de distribución y puntos de venta
+        nodos = [
+            "Centro_Quito", "Centro_Guayaquil", "Centro_Cuenca",
+            "SupermercadoA", "SupermercadoB",
+            "TiendaDistribuidor1", "TiendaDistribuidor2",
+            "TiendaMinorista1", "TiendaMinorista2"
+        ]
 
-        flujo.agregar_arco('A', 'B', 10)
-        flujo.agregar_arco('A', 'D', 10)
-        flujo.agregar_arco('B', 'C', 4)
-        flujo.agregar_arco('B', 'E', 8)
-        flujo.agregar_arco('B', 'D', 2)
-        flujo.agregar_arco('C', 'F', 10)
-        flujo.agregar_arco('D', 'E', 9)
-        flujo.agregar_arco('E', 'C', 6)
-        flujo.agregar_arco('E', 'F', 10)
+        flujo = FlujoMaximo(nodos)
 
-        resultado = flujo.resolver('A', 'F')
+        # Convertir costos a capacidades (botellas/día)
+        # Usar demanda como capacidad
+        capacidades = {
+            ("Centro_Quito", "SupermercadoA"): 5000,
+            ("Centro_Quito", "TiendaDistribuidor1"): 8000,
+            ("Centro_Quito", "TiendaMinorista2"): 2500,
+            ("Centro_Guayaquil", "SupermercadoB"): 4500,
+            ("Centro_Guayaquil", "TiendaDistribuidor2"): 7500,
+            ("Centro_Guayaquil", "TiendaMinorista1"): 3000,
+            ("Centro_Cuenca", "TiendaMinorista1"): 3000,
+            ("Centro_Cuenca", "SupermercadoB"): 4500,
+            ("Centro_Cuenca", "TiendaDistribuidor2"): 7500,
+        }
 
-        mostrar_resolucion_flujo_maximo(resultado, ['A', 'B', 'C', 'D', 'E', 'F'], 'A', 'F')
+        # Agregar arcos al flujo
+        for (origen, destino), capacidad in capacidades.items():
+            flujo.agregar_arco(origen, destino, capacidad)
+
+        # Resolver desde Centro_Quito como origen (podría ser cualquier centro)
+        resultado = flujo.resolver("Centro_Quito", "SupermercadoA")
+
+        mostrar_resolucion_flujo_maximo(resultado, nodos, "Centro_Quito", "SupermercadoA")

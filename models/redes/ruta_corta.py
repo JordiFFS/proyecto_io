@@ -1,5 +1,11 @@
+"""
+Algoritmo de Dijkstra para encontrar la ruta más corta
+Adaptado para la red de distribución Coca-Cola
+"""
+
 import heapq
 import math
+
 
 class RutaMasCorta:
     def __init__(self, matriz_distancias, nodos):
@@ -10,11 +16,10 @@ class RutaMasCorta:
         self.dist = [math.inf] * self.n
         self.pred = [-1] * self.n
         self.visitados = set()
-
-        # HISTORIAL PARA MOSTRAR TODO
         self.iteraciones = []
 
     def resolver(self, origen_idx):
+        """Resuelve el problema de ruta más corta desde un origen"""
         self.dist[origen_idx] = 0
         cola = [(0, origen_idx)]
 
@@ -41,7 +46,7 @@ class RutaMasCorta:
                 antes = self.dist[v]
                 nueva = self.dist[u] + costo
 
-                # GUARDAMOS DATOS (DINÁMICOS)
+                # Guardar datos de relajación
                 relajaciones.append({
                     "desde": self.nodos[u],
                     "hacia": self.nodos[v],
@@ -65,6 +70,7 @@ class RutaMasCorta:
         return self._resultado_final(origen_idx)
 
     def _guardar_iteracion(self, nodo_fijado, relajaciones):
+        """Guarda el estado de cada iteración para visualización"""
         self.iteraciones.append({
             "nodo_fijado": nodo_fijado,
             "distancias": {
@@ -79,13 +85,15 @@ class RutaMasCorta:
         })
 
     def _resultado_final(self, origen_idx):
+        """Construye el resultado final con todas las rutas"""
         rutas = []
         for i in range(self.n):
             ruta = self._reconstruir(i)
             rutas.append({
                 "destino": self.nodos[i],
                 "distancia": self.dist[i] if self.dist[i] != math.inf else "∞",
-                "ruta": " → ".join(self.nodos[j] for j in ruta)
+                "ruta": " → ".join(self.nodos[j] for j in ruta),
+                "ruta_indices": ruta
             })
 
         return {
@@ -98,6 +106,7 @@ class RutaMasCorta:
         }
 
     def _reconstruir(self, i):
+        """Reconstruye la ruta desde origen hasta destino i"""
         r = []
         while i != -1:
             r.append(i)

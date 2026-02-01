@@ -5,13 +5,14 @@ import pandas as pd
 
 class DosFases:
     """
-    Implementación del Método de Dos Fases - VERSIÓN ULTRA DEBUG
+    Implementación del Método de Dos Fases
+    Resuelve problemas de programación lineal con restricciones mixtas (<=, >=, =)
     """
 
     def __init__(self, c: List[float], A: List[List[float]], b: List[float],
                  signos: List[str], tipo: str = "max",
                  nombres_vars: List[str] = None):
-        self.c_original = np.array(c, dtype=float)  # ← GUARDAR ORIGINAL
+        self.c_original = np.array(c, dtype=float)
         self.A_original = np.array(A, dtype=float)
         self.b_original = np.array(b, dtype=float)
         self.tipo = tipo.lower()
@@ -196,10 +197,6 @@ class DosFases:
         return pd.DataFrame(tabla, columns=nombres_cols, index=nombres_filas)
 
     def _fase1(self) -> bool:
-        print("\n" + "=" * 80)
-        print("INICIANDO FASE 1")
-        print("=" * 80)
-
         self.tabla_fase1 = self._construir_tabla_fase1()
 
         self.base = []
@@ -216,9 +213,6 @@ class DosFases:
             elif self.signos[i] == "=":
                 self.base.append(col_actual)
                 col_actual += 1
-
-        print(f"\nBase inicial: {[self.mapeo_columnas.get(idx) for idx in self.base]}")
-        print(f"Índices base: {self.base}")
 
         for i, var_base in enumerate(self.base):
             if var_base in self.var_artificiales_indices:
@@ -238,20 +232,15 @@ class DosFases:
             col_pivote = self._encontrar_columna_pivote(self.tabla_fase1, es_fase1=True)
 
             if col_pivote == -1:
-                print(f"\nFase 1 completada.")
-                print(f"Base final Fase 1: {[self.mapeo_columnas.get(idx) for idx in self.base]}")
                 break
 
             fila_pivote = self._encontrar_fila_pivote(self.tabla_fase1, col_pivote)
 
             if fila_pivote == -1:
-                print(f"\nNo hay fila pivote válida. Problema infactible.")
                 return False
 
             var_entra = self.mapeo_columnas.get(col_pivote, f"var{col_pivote}")
             var_sale = self.mapeo_columnas.get(self.base[fila_pivote], f"var{self.base[fila_pivote]}")
-
-            print(f"\nIteración Fase 1 #{self.iteraciones_fase1 + 1}: {var_entra} entra, {var_sale} sale")
 
             self.base[fila_pivote] = col_pivote
             self._pivotear(self.tabla_fase1, fila_pivote, col_pivote)
@@ -266,79 +255,22 @@ class DosFases:
             })
 
         valor_fase1 = -self.tabla_fase1[-1, -1]
-        print(f"\nValor Fase 1: {valor_fase1}")
 
         if valor_fase1 > 1e-6:
-            print("INFACTIBLE")
             return False
 
-        print("FACTIBLE - Pasando a Fase 2")
         return True
 
     def _fase2(self):
-        """Fase 2 - ULTRA DEBUG - VERSIÓN CORRECTA"""
-        print("\n" + "=" * 80)
-        print("INICIANDO FASE 2")
-        print("=" * 80)
-
+        """Fase 2: Optimizar función objetivo original"""
         self.tabla_fase2 = self._construir_tabla_fase2()
 
-        print(f"\n✓ Base al inicio de Fase 2: {[self.mapeo_columnas.get(idx, f'var{idx}') for idx in self.base]}")
-        print(f"✓ Coeficientes c (en tabla, negados): {self.c}")
-
-        print(f"\n>>> TABLA INICIAL FASE 2:")
-        print(f"    Fila costos: {self.tabla_fase2[-1, :]}")
-        print(f"    RHS inicial: {self.tabla_fase2[-1, -1]}")
-
-        print(f"\n>>> CÁLCULO DE Z INICIAL (CORRECTO):")
-        print(f"    Fórmula: Z = Σ c_original[i] × RHS[i] para cada var básica")
-        print(f"    NOTA: Usar c_original, NO los c negados de la tabla")
-
-        # CRUCIAL: Usar c_original, no self.c (que está negado)
-        valor_z_inicial = 0.0
-        for i, var_base in enumerate(self.base):
-            if var_base < len(self.c_original):  # ← USAR c_original
-                coef = self.c_original[var_base]
-                rhs_valor = self.tabla_fase2[i, -1]
-                contribucion = coef * rhs_valor
-                valor_z_inicial += contribucion
-                print(
-                    f"    i={i}: var={self.mapeo_columnas.get(var_base)}, idx={var_base}, c_original[{var_base}]={coef:.6f}, RHS[{i}]={rhs_valor:.2f} → {contribucion:.2f}")
-            else:
-                print(
-                    f"    i={i}: var={self.mapeo_columnas.get(var_base)}, idx={var_base} → coef=0 (variable de holgura/exceso)")
-
-        print(f"    Z_inicial = {valor_z_inicial:.2f}")
-
-        print(f"\n>>> AJUSTE DE FILA DE COSTOS:")
-        print(f"    ANTES: {self.tabla_fase2[-1, :5]}")
-
+        # Ajustar fila de costos según variables básicas
         for i, var_base in enumerate(self.base):
             if var_base < len(self.c):
                 coef = self.c[var_base]
                 if abs(coef) > 1e-10:
                     self.tabla_fase2[-1, :] -= coef * self.tabla_fase2[i, :]
-
-        print(f"    DESPUÉS: {self.tabla_fase2[-1, :5]}")
-        print(f"    RHS ANTES de ajuste manual: {self.tabla_fase2[-1, -1]}")
-
-        # El RHS debe ser -Z_inicial (formato simplex donde tabla[-1,-1] = -Z)
-        print(f"\n>>> CÁLCULO RHS CORRECTO:")
-        print(f"    Tipo de optimización: {self.tipo}")
-
-        # Para MIN: c fue negado, entonces tabla[-1,-1] = Z_min (sin negar)
-        # Para MAX: c no fue negado, entonces tabla[-1,-1] = -Z_max
-        if self.tipo == "min":
-            # c fue negado, entonces tabla[-1,-1] debe ser -Z_min
-            rhs_correcto = -valor_z_inicial
-            print(f"    MIN: RHS = -Z_inicial = -({valor_z_inicial:.2f}) = {rhs_correcto:.2f}")
-        else:
-            # c no fue negado, entonces tabla[-1,-1] debe ser Z_max directo
-            rhs_correcto = valor_z_inicial
-            print(f"    MAX: RHS = Z_inicial = {valor_z_inicial:.2f}")
-
-        self.tabla_fase2[-1, -1] = rhs_correcto
-        print(f"    RHS DESPUÉS de corrección: {self.tabla_fase2[-1, -1]}")
 
         self.historial_tablas_fase2.append({
             'iteracion': 0,
@@ -354,21 +286,17 @@ class DosFases:
             col_pivote = self._encontrar_columna_pivote(self.tabla_fase2, es_fase1=False)
 
             if col_pivote == -1:
-                print(f"\n✓ Solución óptima encontrada.")
                 self.es_optimo = True
                 break
 
             fila_pivote = self._encontrar_fila_pivote(self.tabla_fase2, col_pivote)
 
             if fila_pivote == -1:
-                print(f"\n✗ Problema NO ACOTADO.")
                 self.es_no_acotado = True
                 break
 
             var_entra = self.mapeo_columnas.get(col_pivote, f"var{col_pivote}")
             var_sale = self.mapeo_columnas.get(self.base[fila_pivote], f"var{self.base[fila_pivote]}")
-
-            print(f"\nIteración Fase 2 #{self.iteraciones_fase2 + 1}: {var_entra} entra, {var_sale} sale")
 
             self.base[fila_pivote] = col_pivote
             self._pivotear(self.tabla_fase2, fila_pivote, col_pivote)
@@ -390,21 +318,18 @@ class DosFases:
             if var_base < self.n:
                 self.solucion[var_base] = self.tabla_fase2[i, -1]
 
-        print(f"\n>>> EXTRACCIÓN DE SOLUCIÓN:")
-        print(f"    Tipo: {self.tipo}")
-        print(f"    Base final: {[self.mapeo_columnas.get(idx) for idx in self.base]}")
-
         valor_tabla = self.tabla_fase2[-1, -1]
-        print(f"    tabla[-1, -1] = {valor_tabla}")
 
-        # LÓGICA CORRECTA FINAL:
-        # Para MIN: c fue negado, entonces tabla[-1,-1] es el valor directo
-        #          Z_min = tabla[-1, -1]
-        # Para MAX: c no fue negado, entonces tabla[-1,-1] está en formato Simplex
-        #          Z_max = tabla[-1, -1] (ya está correctamente ajustado en Fase 2)
-        # En ambos casos: Z = tabla[-1, -1]
-        self.valor_optimo = valor_tabla
-        print(f"    Z_final = tabla[-1, -1] = {valor_tabla}")
+        # LÓGICA CORRECTA PARA DOS FASES:
+        # Para MIN: c fue negado (-c), entonces tabla[-1,-1] almacena Z_min DIRECTO
+        #          Z_min = tabla[-1,-1]
+        # Para MAX: c NO fue negado, entonces tabla[-1,-1] almacena -Z_max
+        #          Z_max = -tabla[-1,-1]
+
+        if self.tipo == "min":
+            self.valor_optimo = valor_tabla
+        else:  # tipo == "max"
+            self.valor_optimo = -valor_tabla
 
         if self.valor_optimo is None:
             self.valor_optimo = 0.0

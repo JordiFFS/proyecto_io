@@ -1,74 +1,72 @@
 import numpy as np
-from typing import List, Dict, Optional
+from typing import List, Dict, Tuple
 import pandas as pd
 from .dos_fases import DosFases
 
 
 class Dual:
     """
-    Método de Dualidad que usa DosFases para resolver correctamente
-    problemas con restricciones mixtas (<=, >=, =)
+    Análisis de Dualidad - Resuelve el Primal y construye/resuelve el Dual teórico
+    Usa DosFases para resolver ambos problemas de forma robusta
     """
 
     def __init__(self, c: List[float], A: List[List[float]], b: List[float],
                  signos: List[str] = None, tipo: str = "max",
-                 nombres_vars: List[str] = None, nombres_restricciones: List[str] = None):
-        self.c_primal_original = np.array(c, dtype=float)
-        self.A_primal_original = np.array(A, dtype=float)
-        self.b_primal_original = np.array(b, dtype=float)
-        self.tipo_primal_original = tipo.lower()
+                 nombres_vars: List[str] = None):
+        """
+        Inicializa el problema Primal
 
-        self.m, self.n = self.A_primal_original.shape
+        Args:
+            c: Coeficientes de la función objetivo
+            A: Matriz de restricciones
+            b: RHS de las restricciones
+            signos: Signos de las restricciones (<=, >=, =)
+            tipo: Tipo de optimización (max o min)
+            nombres_vars: Nombres de las variables
+        """
+        self.c_primal = np.array(c, dtype=float)
+        self.A_primal = np.array(A, dtype=float)
+        self.b_primal = np.array(b, dtype=float)
+        self.tipo_primal = tipo.lower()
 
+        self.m, self.n = self.A_primal.shape  # m restricciones, n variables
+
+        self.signos_primal = signos if signos else ["<="] * self.m
         self.nombres_vars_primal = nombres_vars or [f"x{i + 1}" for i in range(self.n)]
-        self.nombres_restricciones = nombres_restricciones or [f"R{i + 1}" for i in range(self.m)]
 
-        if signos is None:
-            self.signos_primal_original = ["<="] * self.m
-        else:
-            self.signos_primal_original = signos
+        # Construcción del Dual
+        self._construir_dual()
 
-        self.c_dual = None
-        self.A_dual = None
-        self.b_dual = None
-        self.signos_dual = None
-        self.nombres_vars_dual = None
-        self.tipo_dual_teorico = None
+        # Resultados
+        self.resultado_primal = None
+        self.resultado_dual = None
 
-        self.solucion_primal = None
-        self.solucion_dual = None
-        self.valor_optimo_primal = None
-        self.valor_optimo_dual = None
-
-        self.es_optimo_primal = False
-        self.es_optimo_dual = False
-
-    def _construir_dual_teorico(self):
-        """Construye el dual TEÓRICO"""
+    def _construir_dual(self):
+        """Construye el problema DUAL teórico"""
         print("\n" + "=" * 80)
-        print("CONSTRUYENDO DUAL TEÓRICO")
+        print("CONSTRUYENDO PROBLEMA DUAL")
         print("=" * 80)
 
+        # El DUAL siempre tiene:
+        # - Variables: una por cada restricción del primal
+        # - Restricciones: una por cada variable del primal
         self.nombres_vars_dual = [f"y{i + 1}" for i in range(self.m)]
-        self.c_dual = self.b_primal_original.copy()
-        self.A_dual = self.A_primal_original.T.copy()
-        self.b_dual = self.c_primal_original.copy()
 
-        print(f"\nPRIMAL {self.tipo_primal_original.upper()}:")
-        print(f"  c = {self.c_primal_original}")
-        print(f"  A = {self.A_primal_original}")
-        print(f"  b = {self.b_primal_original}")
-        print(f"  Signos: {self.signos_primal_original}")
-        print(f"  Variables: {self.nombres_vars_primal}")
+        # Coeficientes del Dual = RHS del Primal
+        self.c_dual = self.b_primal.copy()
 
-        if self.tipo_primal_original == "min":
-            # MIN primal => MAX dual
-            self.tipo_dual_teorico = "max"
-            # MIN con <= => MAX con >=
-            # MIN con >= => MAX con <=
-            # MIN con = => MAX con =
+        # Matriz del Dual = Transpuesta de la matriz del Primal
+        self.A_dual = self.A_primal.T.copy()
+
+        # RHS del Dual = Coeficientes del Primal
+        self.b_dual = self.c_primal.copy()
+
+        # Signos del Dual (transformación)
+        if self.tipo_primal == "min":
+            # MIN Primal => MAX Dual
+            self.tipo_dual = "max"
             self.signos_dual = []
-            for signo in self.signos_primal_original:
+            for signo in self.signos_primal:
                 if signo == "<=":
                     self.signos_dual.append(">=")
                 elif signo == ">=":
@@ -76,145 +74,142 @@ class Dual:
                 else:
                     self.signos_dual.append("=")
         else:
-            # MAX primal => MIN dual
-            self.tipo_dual_teorico = "min"
-            # MAX con <= => MIN con <=
-            # MAX con >= => MIN con >=
-            # MAX con = => MIN con =
-            self.signos_dual = list(self.signos_primal_original)
+            # MAX Primal => MIN Dual
+            self.tipo_dual = "min"
+            self.signos_dual = list(self.signos_primal)
 
-        print(f"\nDUAL {self.tipo_dual_teorico.upper()}:")
-        print(f"  c = {self.c_dual}")
-        print(f"  A = {self.A_dual}")
-        print(f"  b = {self.b_dual}")
-        print(f"  Signos: {self.signos_dual}")
+        # Mostrar problemas construidos
+        print(f"\nPRIMAL ({self.tipo_primal.upper()}):")
+        print(f"  Variables: {self.nombres_vars_primal}")
+        print(f"  c = {self.c_primal}")
+        print(f"  A shape = {self.A_primal.shape}")
+        print(f"  b = {self.b_primal}")
+        print(f"  Signos = {self.signos_primal}")
+
+        print(f"\nDUAL ({self.tipo_dual.upper()}):")
         print(f"  Variables: {self.nombres_vars_dual}")
+        print(f"  c = {self.c_dual}")
+        print(f"  A shape = {self.A_dual.shape}")
+        print(f"  b = {self.b_dual}")
+        print(f"  Signos = {self.signos_dual}")
 
-    def _resolver_con_dos_fases(self, c, A, b, signos, tipo, nombres, nombre_problema):
-        """Resuelve usando DosFases"""
+    def _resolver_problema(self, c: List[float], A: List[List[float]],
+                           b: List[float], signos: List[str],
+                           tipo: str, nombres: List[str],
+                           nombre_problema: str) -> Dict:
+        """
+        Resuelve un problema usando DosFases
+
+        Returns:
+            Dict con los resultados del problema
+        """
         print(f"\n{'-' * 80}")
         print(f"RESOLVIENDO {nombre_problema}")
         print(f"{'-' * 80}")
 
         try:
-            # Usar DosFases
-            dos_fases = DosFases(c, A, b, signos, tipo=tipo, nombres_vars=nombres)
+            # Crear instancia de DosFases
+            dos_fases = DosFases(
+                c, A, b, signos,
+                tipo=tipo,
+                nombres_vars=nombres
+            )
+
+            # Resolver
             resultado = dos_fases.resolver(verbose=False)
 
+            # Extraer información clave
             if resultado['exito']:
-                # IMPORTANTE: DosFases ya retorna el valor correcto
-                # NO modificar, usar directamente
-                z_optimo = resultado['valor_optimo']
-
-                print(f"✓ Óptimo encontrado")
-                print(f"  Z = {z_optimo}")
-
-                valores = [resultado['solucion_variables'].get(n, 0.0) for n in nombres]
-                print(f"  Solución: {dict(zip(nombres, valores))}")
-                print(f"  Iteraciones Fase 1: {resultado['iteraciones_fase1']}")
-                print(f"  Iteraciones Fase 2: {resultado['iteraciones_fase2']}")
-
-                return True, np.array(valores), z_optimo
+                print(f"✓ {nombre_problema} resuelto exitosamente")
+                print(f"  Z = {resultado['valor_optimo']}")
+                print(f"  Iteraciones: {resultado['iteraciones_fase1'] + resultado['iteraciones_fase2']}")
             else:
-                print(f"✗ {resultado['estado']}")
-                print(f"  Infactible: {resultado['es_infactible']}")
-                print(f"  No acotado: {resultado['es_no_acotado']}")
-                return False, None, None
+                print(f"✗ {nombre_problema} no pudo ser resuelto")
+                print(f"  Estado: {resultado.get('estado', 'Desconocido')}")
+
+            return resultado
 
         except Exception as e:
-            print(f"Error en resolución: {e}")
+            print(f"Error al resolver {nombre_problema}: {str(e)}")
             import traceback
             traceback.print_exc()
-            return False, None, None
+            return None
 
-    def resolver(self, verbose: bool = False) -> Dict:
-        """Resuelve el primal y el dual"""
-        self._construir_dual_teorico()
+    def resolver(self) -> Dict:
+        """
+        Resuelve el Primal y el Dual
+        Verifica la dualidad fuerte
 
-        # RESOLVER PRIMAL usando DosFases
-        es_opt_p, sol_p, z_p = self._resolver_con_dos_fases(
-            self.c_primal_original.tolist(),
-            self.A_primal_original.tolist(),
-            self.b_primal_original.tolist(),
-            self.signos_primal_original,
-            self.tipo_primal_original,
+        Returns:
+            Dict con resultados del análisis primal-dual
+        """
+        # RESOLVER PRIMAL
+        self.resultado_primal = self._resolver_problema(
+            self.c_primal.tolist(),
+            self.A_primal.tolist(),
+            self.b_primal.tolist(),
+            self.signos_primal,
+            self.tipo_primal,
             self.nombres_vars_primal,
             "PRIMAL"
         )
 
-        self.es_optimo_primal = es_opt_p
-        self.solucion_primal = sol_p if sol_p is not None else np.zeros(self.n)
-        self.valor_optimo_primal = z_p
-
-        # RESOLVER DUAL usando DosFases
-        es_opt_d, sol_d, z_d = self._resolver_con_dos_fases(
+        # RESOLVER DUAL
+        self.resultado_dual = self._resolver_problema(
             self.c_dual.tolist(),
             self.A_dual.tolist(),
             self.b_dual.tolist(),
             self.signos_dual,
-            self.tipo_dual_teorico,
+            self.tipo_dual,
             self.nombres_vars_dual,
             "DUAL"
         )
-
-        self.es_optimo_dual = es_opt_d
-        self.solucion_dual = sol_d if sol_d is not None else np.zeros(self.m)
-        self.valor_optimo_dual = z_d
 
         # VERIFICAR DUALIDAD FUERTE
         print("\n" + "=" * 80)
         print("VERIFICACIÓN DUALIDAD FUERTE")
         print("=" * 80)
 
+        z_primal = None
+        z_dual = None
         dualidad_fuerte = False
         diferencia = None
 
-        if (self.es_optimo_primal and self.es_optimo_dual and
-                self.valor_optimo_primal is not None and self.valor_optimo_dual is not None):
-            diferencia = abs(self.valor_optimo_primal - self.valor_optimo_dual)
+        if (self.resultado_primal and self.resultado_dual and
+                self.resultado_primal.get('exito') and self.resultado_dual.get('exito')):
+
+            z_primal = self.resultado_primal['valor_optimo']
+            z_dual = self.resultado_dual['valor_optimo']
+            diferencia = abs(z_primal - z_dual)
             dualidad_fuerte = diferencia < 1e-3
 
-            print(f"Z_primal = {self.valor_optimo_primal}")
-            print(f"Z_dual = {self.valor_optimo_dual}")
-            print(f"Diferencia = {diferencia}")
-            print(f"Dualidad fuerte: {'✓ VERIFICADA' if dualidad_fuerte else '✗ NO VERIFICADA'}")
+            print(f"Z_primal = {z_primal}")
+            print(f"Z_dual   = {z_dual}")
+            print(f"Diferencia = {diferencia:.2e}")
+            print(f"\nDualidad Fuerte: {'✓ VERIFICADA' if dualidad_fuerte else '✗ NO VERIFICADA'}")
         else:
-            print(f"No se puede verificar dualidad fuerte:")
-            print(f"  Primal óptimo: {self.es_optimo_primal} (valor: {self.valor_optimo_primal})")
-            print(f"  Dual óptimo: {self.es_optimo_dual} (valor: {self.valor_optimo_dual})")
+            print("No se puede verificar dualidad fuerte (uno de los problemas no se resolvió)")
 
-        # Construir soluciones con datos de resultado original
-        resultado_primal = {
-            'tipo': 'PRIMAL',
-            'exito': self.es_optimo_primal,
-            'valor_optimo': self.valor_optimo_primal,
-            'solucion': {self.nombres_vars_primal[i]: float(self.solucion_primal[i])
-                         for i in range(min(len(self.nombres_vars_primal), len(self.solucion_primal)))},
-            'iteraciones': 0,
-            'es_optimo': self.es_optimo_primal,
-            'es_no_acotado': False,
-            'es_infactible': not self.es_optimo_primal
-        }
-
-        resultado_dual = {
-            'tipo': 'DUAL',
-            'exito': self.es_optimo_dual,
-            'valor_optimo': self.valor_optimo_dual,
-            'solucion': {self.nombres_vars_dual[i]: float(self.solucion_dual[i])
-                         for i in range(min(len(self.nombres_vars_dual), len(self.solucion_dual)))},
-            'iteraciones': 0,
-            'es_optimo': self.es_optimo_dual,
-            'es_no_acotado': False,
-            'es_infactible': not self.es_optimo_dual
-        }
-
+        # CONSTRUIR RESULTADO FINAL
         resultado_final = {
-            'primal': resultado_primal,
-            'dual': resultado_dual,
+            'primal': {
+                'exito': self.resultado_primal['exito'] if self.resultado_primal else False,
+                'valor_optimo': z_primal,
+                'solucion': self._extraer_solucion_primal() if self.resultado_primal else {},
+                'iteraciones': (self.resultado_primal['iteraciones_fase1'] +
+                                self.resultado_primal['iteraciones_fase2']) if self.resultado_primal else 0,
+            },
+            'dual': {
+                'exito': self.resultado_dual['exito'] if self.resultado_dual else False,
+                'valor_optimo': z_dual,
+                'solucion': self._extraer_solucion_dual() if self.resultado_dual else {},
+                'iteraciones': (self.resultado_dual['iteraciones_fase1'] +
+                                self.resultado_dual['iteraciones_fase2']) if self.resultado_dual else 0,
+            },
             'dualidad_fuerte': dualidad_fuerte,
             'diferencia_valores_optimos': float(diferencia) if diferencia is not None else None,
-            'tipo_primal_original': self.tipo_primal_original,
-            'tipo_dual': self.tipo_dual_teorico,
+            'tipo_primal_original': self.tipo_primal,
+            'tipo_dual': self.tipo_dual,
             'nombres_vars_primal': self.nombres_vars_primal,
             'nombres_vars_dual': self.nombres_vars_dual,
         }
@@ -223,24 +218,23 @@ class Dual:
         print("RESULTADO FINAL")
         print("=" * 80)
         print(f"Primal: {resultado_final['primal']['exito']} (Z={resultado_final['primal']['valor_optimo']})")
-        print(f"Dual: {resultado_final['dual']['exito']} (Z={resultado_final['dual']['valor_optimo']})")
-        print(f"Dualidad fuerte: {resultado_final['dualidad_fuerte']}")
+        print(f"Dual:   {resultado_final['dual']['exito']} (Z={resultado_final['dual']['valor_optimo']})")
+        print(f"Dualidad Fuerte: {resultado_final['dualidad_fuerte']}")
 
         return resultado_final
 
-    def obtener_comparacion_problemas(self) -> pd.DataFrame:
-        """Retorna comparación de primal vs dual"""
-        comparacion = {
-            'Aspecto': ['Tipo Optimización', 'Variables', 'Restricciones'],
-            'Primal': [
-                self.tipo_primal_original.upper(),
-                f"{self.n}: {', '.join(self.nombres_vars_primal)}",
-                f"{self.m}",
-            ],
-            'Dual': [
-                self.tipo_dual_teorico.upper(),
-                f"{self.m}: {', '.join(self.nombres_vars_dual)}",
-                f"{self.n}",
-            ]
-        }
-        return pd.DataFrame(comparacion)
+    def _extraer_solucion_primal(self) -> Dict[str, float]:
+        """Extrae la solución del PRIMAL en formato dict"""
+        solucion = {}
+        if self.resultado_primal:
+            for var in self.nombres_vars_primal:
+                solucion[var] = self.resultado_primal['solucion_variables'].get(var, 0.0)
+        return solucion
+
+    def _extraer_solucion_dual(self) -> Dict[str, float]:
+        """Extrae la solución del DUAL en formato dict"""
+        solucion = {}
+        if self.resultado_dual:
+            for var in self.nombres_vars_dual:
+                solucion[var] = self.resultado_dual['solucion_variables'].get(var, 0.0)
+        return solucion

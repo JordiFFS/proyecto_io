@@ -56,7 +56,7 @@ def ejemplo_dual_coca_cola():
             nombres_vars=["Quito→Quito", "Quito→Guayaquil", "Guayaquil→Cuenca"]
         )
 
-        resultado = dual.resolver(verbose=False)
+        resultado = dual.resolver()
 
         if resultado['primal']['exito'] and resultado['dual']['exito']:
             st.success("✅ Análisis Primal-Dual completado exitosamente")

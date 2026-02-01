@@ -1,21 +1,141 @@
-# views/resolucion_costo_minimo.py
+"""
+views/resolucion_costo_minimo.py
+Vista para Flujo de Costo Mínimo adaptada a Coca-Cola
+"""
 
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 from models.redes.red import Red
 from models.redes.flujo_costo_minimo import FlujoCostoMinimo
+from empresa.datos_empresa import CENTROS_DISTRIBUCION, PUNTOS_VENTA, COSTOS_TRANSPORTE_VENTA
+
+
+def crear_grafo_flujo_costo(nodos, arcos_flujo, origen, destino):
+    """
+    Crea un gráfico del flujo de costo mínimo en la red
+    """
+    fig = go.Figure()
+
+    posiciones = {
+        "Centro_Quito": (0, 2),
+        "Centro_Guayaquil": (0, 1),
+        "Centro_Cuenca": (0, 0),
+        "SupermercadoA": (2, 2.2),
+        "SupermercadoB": (2, 0.8),
+        "TiendaDistribuidor1": (2, 2),
+        "TiendaDistribuidor2": (2, 1),
+        "TiendaMinorista1": (2, -0.2),
+        "TiendaMinorista2": (2, 2.4),
+    }
+
+    # Agregar arcos con flujo
+    for (u, v), flujo in arcos_flujo.items():
+        if u in posiciones and v in posiciones and flujo > 0:
+            x0, y0 = posiciones[u]
+            x1, y1 = posiciones[v]
+
+            fig.add_trace(go.Scatter(
+                x=[x0, x1],
+                y=[y0, y1],
+                mode="lines",
+                line=dict(width=3, color="#FF6B6B"),
+                hovertemplate=f"<b>{u} → {v}</b><br>Flujo: {flujo:.2f}<extra></extra>",
+                showlegend=False
+            ))
+
+    colores_nodo = {
+        "Centro_Quito": "#32CD32",
+        "Centro_Guayaquil": "#32CD32",
+        "Centro_Cuenca": "#32CD32",
+        "SupermercadoA": "#FFB84D",
+        "SupermercadoB": "#FFB84D",
+        "TiendaDistribuidor1": "#FFB84D",
+        "TiendaDistribuidor2": "#FFB84D",
+        "TiendaMinorista1": "#FFB84D",
+        "TiendaMinorista2": "#FFB84D",
+    }
+
+    for nodo, (x, y) in posiciones.items():
+        if nodo in nodos:
+            color = colores_nodo.get(nodo, "#808080")
+
+            tamano = 35 if nodo in [origen, destino] else 25
+            if nodo == origen:
+                borde_color = "#00FF00"
+                borde_ancho = 3
+            elif nodo == destino:
+                borde_color = "#FF0000"
+                borde_ancho = 3
+            else:
+                borde_color = "white"
+                borde_ancho = 1
+
+            fig.add_trace(go.Scatter(
+                x=[x],
+                y=[y],
+                mode="markers+text",
+                marker=dict(
+                    size=tamano,
+                    color=color,
+                    line=dict(width=borde_ancho, color=borde_color)
+                ),
+                text=[nodo],
+                textposition="top center",
+                textfont=dict(size=9, color="white", family="Arial Black"),
+                hovertemplate=f"<b>{nodo}</b><extra></extra>",
+                showlegend=False
+            ))
+
+    fig.update_layout(
+        title=dict(
+            text=f"Flujo de Costo Mínimo - De {origen} a {destino}",
+            font=dict(size=20, color="white")
+        ),
+        showlegend=True,
+        hovermode="closest",
+        xaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            range=[-0.5, 2.5]
+        ),
+        yaxis=dict(
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+            range=[-0.5, 2.8]
+        ),
+        plot_bgcolor="#1a1a1a",
+        paper_bgcolor="#0d0d0d",
+        font=dict(color="white"),
+        height=600,
+        margin=dict(b=50, l=50, r=50, t=100)
+    )
+
+    colores_leyenda = [
+        ("Centros Distribución", "#32CD32"),
+        ("Puntos Venta", "#FFB84D"),
+        ("Flujo Activo", "#FF6B6B"),
+        ("Origen", "#00FF00"),
+        ("Destino", "#FF0000")
+    ]
+
+    for nombre, color_ley in colores_leyenda:
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None],
+            mode='markers',
+            marker=dict(size=12, color=color_ley),
+            showlegend=True,
+            name=nombre
+        ))
+
+    return fig
 
 
 def mostrar_resolucion_flujo_costo_minimo(resultado, origen, destino, flujo_requerido):
     """
-    Muestra la resolución completa del algoritmo de flujo de costo mínimo
-    usando rutas de menor costo sucesivas
-
-    Args:
-        resultado: Diccionario con resultado del flujo de costo mínimo
-        origen: Nodo origen
-        destino: Nodo destino
-        flujo_requerido: Cantidad de flujo a transportar
+    Muestra la resolución completa del problema de flujo de costo mínimo
     """
 
     st.success("✅ Flujo de Costo Mínimo Calculado Exitosamente")
@@ -27,33 +147,34 @@ def mostrar_resolucion_flujo_costo_minimo(resultado, origen, destino, flujo_requ
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("🟢 Nodo Origen", origen)
+        st.metric("🟢 Origen", origen)
     with col2:
-        st.metric("🔴 Nodo Destino", destino)
+        st.metric("🔴 Destino", destino)
     with col3:
-        st.metric("🌊 Flujo Requerido", f"{flujo_requerido:.2f}")
+        st.metric("📦 Flujo Requerido", f"{flujo_requerido:.2f}")
     with col4:
-        st.metric("🔍 Algoritmo", "Dijkstra Sucesivo")
+        st.metric("💰 Costo Total", f"${resultado.get('costo_total', 0):.2f}")
 
     # INFORMACIÓN GENERAL
     st.write("---")
-    st.markdown("<h2 class='section-header'>🏆 RESULTADO FINAL</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='section-header'>🏆 RESULTADO DEL FLUJO ÓPTIMO</h2>",
+                unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("💰 Costo Total", f"{resultado['costo_total']:.2f}")
+        st.metric("📤 Flujo Enviado", f"{resultado.get('flujo_enviado', 0):.2f}")
     with col2:
-        st.metric("🔄 Iteraciones", len(resultado['iteraciones']))
+        st.metric("💰 Costo Total", f"${resultado.get('costo_total', 0):.2f}")
     with col3:
-        st.metric("📊 Flujo Entregado", f"{flujo_requerido:.2f}")
+        st.metric("📈 Costo Promedio", f"${resultado.get('costo_promedio', 0):.2f}")
 
-    # ITERACIONES - RUTAS SUCESIVAS
+    # ITERACIONES - CAMINOS DE MENOR COSTO
     st.write("---")
     st.markdown("<h2 class='section-header'>🔄 Iteraciones - Rutas de Menor Costo Sucesivas</h2>",
                 unsafe_allow_html=True)
 
-    if resultado['iteraciones']:
-        tab_list = [f"Ruta {i + 1}" for i in range(len(resultado['iteraciones']))]
+    if resultado.get('iteraciones'):
+        tab_list = [f"Paso {i + 1}" for i in range(len(resultado['iteraciones']))]
         tabs_iter = st.tabs(tab_list)
 
         for iter_num, tab in enumerate(tabs_iter):
@@ -64,120 +185,82 @@ def mostrar_resolucion_flujo_costo_minimo(resultado, origen, destino, flujo_requ
                     f"<div class='iteration-header'><h3>Iteración {iter_num + 1} - Ruta de Menor Costo</h3></div>",
                     unsafe_allow_html=True)
 
-                # Información de la ruta
-                col1, col2, col3, col4 = st.columns(4)
-
-                ruta_str = " → ".join(iter_info['ruta'])
+                # Información del camino
+                col1, col2, col3 = st.columns(3)
                 with col1:
+                    ruta_str = " → ".join([str(arco[0]) for arco in iter_info.get('ruta', [])] +
+                                          [str(iter_info.get('ruta', [])[-1][1])] if iter_info.get('ruta') else "N/A")
                     st.markdown(
                         f"<div class='metric-box'><strong>Ruta:</strong><br>{ruta_str}</div>",
                         unsafe_allow_html=True)
                 with col2:
                     st.markdown(
-                        f"<div class='metric-box'><strong>Costo/Unidad:</strong><br>${iter_info['costo_ruta']:.2f}</div>",
+                        f"<div class='metric-box'><strong>Flujo:</strong><br>{iter_info.get('flujo_enviado', 0):.2f}</div>",
                         unsafe_allow_html=True)
                 with col3:
                     st.markdown(
-                        f"<div class='metric-box'><strong>Flujo Enviado:</strong><br>{iter_info['flujo_enviado']:.2f}</div>",
-                        unsafe_allow_html=True)
-                with col4:
-                    st.markdown(
-                        f"<div class='metric-box'><strong>Costo Ruta:</strong><br>${iter_info['flujo_enviado'] * iter_info['costo_ruta']:.2f}</div>",
+                        f"<div class='metric-box'><strong>Costo:</strong><br>${iter_info.get('costo_ruta', 0):.2f}</div>",
                         unsafe_allow_html=True)
 
-                # Información del flujo
-                col_flujo1, col_flujo2 = st.columns(2)
-                with col_flujo1:
-                    st.write(f"**Flujo Acumulado:** {flujo_requerido - iter_info['flujo_restante']:.2f}")
-                with col_flujo2:
-                    st.write(f"**Flujo Restante:** {iter_info['flujo_restante']:.2f}")
+                # Detalles de arcos
+                if iter_info.get('ruta'):
+                    st.subheader("🔗 Arcos de la Ruta")
+                    arcos_data = []
+                    for i, (u, v) in enumerate(iter_info['ruta']):
+                        arcos_data.append({
+                            '#': i + 1,
+                            'Desde': u,
+                            'Hacia': v,
+                            'Arco': f"{u} → {v}",
+                            'Flujo': f"{iter_info.get('flujo_enviado', 0):.2f}"
+                        })
+
+                    arcos_df = pd.DataFrame(arcos_data)
+                    st.dataframe(arcos_df, use_container_width=True, hide_index=True)
 
     else:
-        st.info("No se requirieron iteraciones (flujo inicial = 0).")
+        st.info("No hay iteraciones disponibles.")
 
-    # RESUMEN DE RUTAS
+    # RESUMEN DE FLUJOS
     st.write("---")
-    st.markdown("<h2 class='section-header'>📊 Resumen de Rutas y Costos</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='section-header'>📊 Resumen de Rutas</h2>", unsafe_allow_html=True)
 
     summary_data = []
-    costo_acumulado = 0
+    if resultado.get('iteraciones'):
+        for i, iter_info in enumerate(resultado['iteraciones'], 1):
+            ruta_str = " → ".join([str(arco[0]) for arco in iter_info.get('ruta', [])] +
+                                  [str(iter_info.get('ruta', [])[-1][1])]) if iter_info.get('ruta') else "N/A"
+            summary_data.append({
+                'Iteración': i,
+                'Ruta': ruta_str,
+                'Flujo': f"{iter_info.get('flujo_enviado', 0):.2f}",
+                'Costo': f"${iter_info.get('costo_ruta', 0):.2f}"
+            })
 
-    for i, iter_info in enumerate(resultado['iteraciones'], 1):
-        costo_ruta = iter_info['flujo_enviado'] * iter_info['costo_ruta']
-        costo_acumulado += costo_ruta
-
-        summary_data.append({
-            'Iteración': i,
-            'Ruta': " → ".join(iter_info['ruta']),
-            'Costo/Unidad': f"${iter_info['costo_ruta']:.2f}",
-            'Flujo': f"{iter_info['flujo_enviado']:.2f}",
-            'Costo Ruta': f"${costo_ruta:.2f}",
-            'Acumulado': f"${costo_acumulado:.2f}"
-        })
-
-    if summary_data:
         summary_df = pd.DataFrame(summary_data)
         st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
-    # ANÁLISIS DE COSTOS
-    st.subheader("💹 Análisis de Costos")
+    # VISUALIZACIÓN GRÁFICA
+    st.write("---")
+    st.markdown("<h2 class='section-header'>🗺️ VISUALIZACIÓN GRÁFICA DEL FLUJO</h2>",
+                unsafe_allow_html=True)
 
-    col_costo1, col_costo2, col_costo3 = st.columns(3)
+    # Calcular flujos por arco
+    nodos = list(resultado.get('flujo_arcos', {}).keys()) if isinstance(resultado.get('flujo_arcos'), dict) else []
+    arcos_flujo = resultado.get('flujo_arcos', {})
 
-    with col_costo1:
-        st.metric("Costo Total", f"${resultado['costo_total']:.2f}")
-
-    with col_costo2:
-        if len(resultado['iteraciones']) > 0:
-            costo_promedio = resultado['costo_total'] / flujo_requerido
-            st.metric("Costo Promedio/Unidad", f"${costo_promedio:.2f}")
-        else:
-            st.metric("Costo Promedio/Unidad", "$0.00")
-
-    with col_costo3:
-        st.metric("Rutas Utilizadas", len(resultado['iteraciones']))
-
-    # DESGLOSE POR RUTA
-    st.subheader("🔗 Desglose por Ruta")
-
-    desglose_data = []
-    for i, iter_info in enumerate(resultado['iteraciones'], 1):
-        desglose_data.append({
-            'Ruta #': i,
-            'Camino': " → ".join(iter_info['ruta']),
-            'Unidades': f"{iter_info['flujo_enviado']:.2f}",
-            'Costo Unitario': f"${iter_info['costo_ruta']:.2f}",
-            'Costo Total': f"${iter_info['flujo_enviado'] * iter_info['costo_ruta']:.2f}",
-            'Porcentaje': f"{(iter_info['flujo_enviado'] / flujo_requerido) * 100:.1f}%"
-        })
-
-    desglose_df = pd.DataFrame(desglose_data)
-    st.dataframe(desglose_df, use_container_width=True, hide_index=True)
-
-    # VERIFICACIÓN
-    st.subheader("✔️ Verificación")
-
-    col_verif1, col_verif2, col_verif3 = st.columns(3)
-
-    flujo_total_enviado = sum(iter['flujo_enviado'] for iter in resultado['iteraciones'])
-
-    with col_verif1:
-        st.metric("Flujo Requerido", f"{flujo_requerido:.2f}")
-
-    with col_verif2:
-        st.metric("Flujo Enviado", f"{flujo_total_enviado:.2f}")
-
-    with col_verif3:
-        coincide = abs(flujo_requerido - flujo_total_enviado) < 0.01
-        st.metric("Coincide", "✓" if coincide else "✗")
+    if arcos_flujo:
+        fig_flujo = crear_grafo_flujo_costo(nodos, arcos_flujo, origen, destino)
+        st.plotly_chart(fig_flujo, use_container_width=True)
 
     # PROPIEDADES
+    st.write("---")
     st.subheader("⚙️ Propiedades del Algoritmo")
     st.write("""
-    - **Algoritmo**: Rutas de Menor Costo Sucesivas (Dijkstra Iterativo)
-    - **Método**: Encuentra iterativamente la ruta de menor costo
-    - **Característica**: Óptima para flujos divisibles
-    - **Propiedad**: Minimiza el costo total de transporte
+    - **Algoritmo**: Rutas de Menor Costo Sucesivas
+    - **Objetivo**: Minimizar el costo total mientras se envía el flujo requerido
+    - **Propiedad**: Encuentra la solución óptima de costo mínimo
+    - **Iteraciones**: Una por cada ruta de menor costo encontrada
     """)
 
     # RESUMEN FINAL
@@ -198,39 +281,47 @@ def mostrar_resolucion_flujo_costo_minimo(resultado, origen, destino, flujo_requ
     with summary_col2:
         st.write(f"""
         **Resultados:**
-        - Costo Total: ${resultado['costo_total']:.2f}
-        - Rutas Utilizadas: {len(resultado['iteraciones'])}
-        - Costo Promedio: ${resultado['costo_total'] / flujo_requerido:.2f}/unidad
-        - Eficiencia: ✓ Óptima
+        - Flujo Enviado: {resultado.get('flujo_enviado', 0):.2f}
+        - Costo Total: ${resultado.get('costo_total', 0):.2f}
+        - Costo Promedio: ${resultado.get('costo_promedio', 0):.2f}
+        - Iteraciones: {len(resultado.get('iteraciones', []))}
         """)
 
 
 def ejemplo_flujo_costo_minimo():
-    """Ejemplo predefinido de flujo de costo mínimo"""
-    st.subheader("Ejemplo: Transporte de Mercancía con Costo Mínimo")
+    """Ejemplo de Flujo de Costo Mínimo con datos de Coca-Cola"""
+    st.subheader("📦 Ejemplo: Flujo de Costo Mínimo - Red de Distribución Coca-Cola")
     st.write("""
-    **Problema:** Enviar 25 unidades de mercancía desde A hacia E
-    minimizando el costo total de transporte.
-
-    **Red de transporte:**
-    - A → B: capacidad 15, costo $2/unidad
-    - A → C: capacidad 20, costo $3/unidad
-    - B → D: capacidad 10, costo $1/unidad
-    - B → E: capacidad 15, costo $4/unidad
-    - C → D: capacidad 20, costo $2/unidad
-    - D → E: capacidad 25, costo $1/unidad
+    **Problema:** Enviar un volumen específico de botellas desde centros de distribución 
+    a puntos de venta minimizando el costo total de transporte.
     """)
 
-    if st.button("Ejecutar Ejemplo", key="ej_flujo_costo"):
-        flujo_costo = FlujoCostoMinimo(['A', 'B', 'C', 'D', 'E'])
+    if st.button("Ejecutar Ejemplo Coca-Cola", key="ej_flujo_costo_coca_cola"):
+        nodos = [
+            "Centro_Quito", "Centro_Guayaquil", "Centro_Cuenca",
+            "SupermercadoA", "SupermercadoB",
+            "TiendaDistribuidor1", "TiendaDistribuidor2",
+            "TiendaMinorista1", "TiendaMinorista2"
+        ]
 
-        flujo_costo.agregar_arco('A', 'B', 15, 2)
-        flujo_costo.agregar_arco('A', 'C', 20, 3)
-        flujo_costo.agregar_arco('B', 'D', 10, 1)
-        flujo_costo.agregar_arco('B', 'E', 15, 4)
-        flujo_costo.agregar_arco('C', 'D', 20, 2)
-        flujo_costo.agregar_arco('D', 'E', 25, 1)
+        flujo_costo = FlujoCostoMinimo(nodos)
 
-        resultado = flujo_costo.resolver('A', 'E', 25)
+        # Rutas con capacidad y costo
+        rutas = [
+            ("Centro_Quito", "SupermercadoA", 5000, 0.03),
+            ("Centro_Quito", "TiendaDistribuidor1", 8000, 0.02),
+            ("Centro_Quito", "TiendaMinorista2", 2500, 0.03),
+            ("Centro_Guayaquil", "SupermercadoB", 4500, 0.03),
+            ("Centro_Guayaquil", "TiendaDistribuidor2", 7500, 0.02),
+            ("Centro_Guayaquil", "TiendaMinorista1", 3000, 0.12),
+            ("Centro_Cuenca", "TiendaMinorista1", 3000, 0.03),
+            ("Centro_Cuenca", "SupermercadoB", 4500, 0.12),
+            ("Centro_Cuenca", "TiendaDistribuidor2", 7500, 0.12),
+        ]
 
-        mostrar_resolucion_flujo_costo_minimo(resultado, 'A', 'E', 25)
+        for origen, destino, capacidad, costo in rutas:
+            flujo_costo.agregar_arco(origen, destino, capacidad, costo)
+
+        resultado = flujo_costo.resolver("Centro_Quito", "SupermercadoA", 5000)
+
+        mostrar_resolucion_flujo_costo_minimo(resultado, "Centro_Quito", "SupermercadoA", 5000)
