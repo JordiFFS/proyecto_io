@@ -1,31 +1,116 @@
 # 🎯 Sistema de Optimización Empresarial - Investigación Operativa
 
 **Proyecto Integral de Análisis y Optimización de Procesos Empresariales**
+**Caso Real: Coca-Cola Embotelladora Nacional**
 
 ## 📋 Descripción General
 
-Sistema completo desarrollado desde cero que resuelve problemas complejos de Investigación Operativa (IO) aplicados a contextos empresariales reales. Integra múltiples métodos matemáticos clásicos con análisis de sensibilidad mediante IA.
+Sistema completo desarrollado desde cero que resuelve problemas complejos de Investigación Operativa (IO) aplicados a contextos empresariales reales. Integra múltiples métodos matemáticos clásicos con análisis de sensibilidad mediante IA (Gemini, Hugging Face, Ollama).
 
 ### ✨ Características Principales
 
-- ✅ **Programación Lineal**: Simplex, Gran M, Dos Fases, Método Dual
-- ✅ **Problemas de Transporte**: Esquina Noroeste, Costo Mínimo, Vogel
-- ✅ **Problemas de Redes**: Ruta Corta (Dijkstra), Árbol Mínimo, Flujo Máximo
-- ✅ **Gestión de Inventarios**: Modelo EOQ
-- ✅ **Análisis de Sensibilidad con IA**: Evaluación automática de robustez
-- ✅ **Caso Empresarial Integral**: Aplicación real "TechOptimize S.A."
-- ✅ **Interfaz Web**: Streamlit interactivo
-- ✅ **Acceso Remoto**: ngrok para compartir
+#### 📐 Programación Lineal Completa
+- **Simplex**: Método simplex completo con visualización paso a paso
+- **Gran M**: Para problemas con restricciones de igualdad y desigualdad
+- **Dos Fases**: Método de dos fases para problemas complejos
+- **Método Dual**: Análisis de dualidad y precios sombra
+- Visualización de 5 fases por iteración
+- Análisis de costos reducidos y razones mínimas
+- Detección de soluciones no acotadas e infactibles
 
-### 🔧 Implementación
+#### 🚚 Problemas de Transporte
+- **Esquina Noroeste**: Método de solución inicial
+- **Costo Mínimo**: Minimización de costos de transporte
+- **Vogel (VAM)**: Método con análisis de penalizaciones
+- **MODI + Stepping Stone**: Optimización iterativa
+- Visualización gráfica de rutas
+- Verificación de restricciones
 
-**Todos los modelos están desarrollados desde cero, sin usar librerías de optimización como:**
-- ❌ PuLP
-- ❌ Scipy.optimize
-- ❌ CPLEX
-- ❌ Gurobi
+#### 🌐 Problemas de Redes
+- **Dijkstra**: Ruta más corta
+- **Kruskal**: Árbol de expansión mínima
+- **Ford-Fulkerson**: Flujo máximo
+- **Costo Mínimo**: Flujo de costo mínimo
+- Visualización interactiva de grafos
 
-Se implementaron manualmente todos los algoritmos para cumplir con los requerimientos académicos.
+#### 📦 Gestión de Inventarios
+- **Modelo EOQ**: Economic Order Quantity
+- Análisis de punto de reorden
+- Consideración de productos perecederos
+- Gráficos de evolución de inventario
+
+#### 🤖 Análisis de Sensibilidad con IA Múltiple
+- 🤖 **Gemini**: Análisis profundo y contextualizado
+- 🧠 **Hugging Face**: Análisis con modelos open-source
+- 💻 **Ollama**: Análisis completamente local
+- Comparación automática de resultados
+- Pestañas interactivas
+
+#### 🏭 Caso Empresarial Integral Coca-Cola
+- Análisis de producción multi-planta
+- Optimización de distribución multi-nivel
+- Gestión de inventarios de materias primas perecederas
+- Análisis de sensibilidad estratégico
+- KPIs del negocio
+
+#### 🌐 Interfaz Web Interactiva
+- Streamlit completa y responsiva
+- Visualizaciones dinámicas
+- Tablas interactivas
+
+#### 🔄 Acceso Remoto
+- ngrok para compartir y colaborar
+- URL pública automática
+
+---
+
+## 🏭 Caso Empresarial: Coca-Cola Embotelladora Nacional
+
+### 📊 Información General
+
+| Parámetro | Valor |
+|-----------|-------|
+| **Empresa** | Coca-Cola Embotelladora Nacional |
+| **Tipo** | Industria de Bebidas |
+| **Ubicación** | Quito, Ecuador |
+| **Fundación** | 2010 |
+| **Empleados** | 450 |
+
+### 🏭 Plantas de Producción
+
+| Planta | Ubicación | Capacidad Mensual | Costo Unitario |
+|--------|-----------|-------------------|----------------|
+| **Quito** | Quito - Pichincha | 1,500,000 | $0.85 |
+| **Guayaquil** | Guayaquil - Guayas | 1,350,000 | $0.80 |
+| **Cuenca** | Cuenca - Azuay | 900,000 | $0.88 |
+
+**Capacidad Total:** 3,750,000 botellas/mes
+
+### 📦 Centros de Distribución
+
+| Centro | Capacidad | Costo Almacenamiento |
+|--------|-----------|----------------------|
+| **Quito** | 500,000 | $0.02/botella/día |
+| **Guayaquil** | 450,000 | $0.025/botella/día |
+| **Cuenca** | 250,000 | $0.03/botella/día |
+
+**Capacidad Total:** 1,200,000 botellas
+
+### 🥤 Cartera de Productos
+
+| Producto | Precio | Costo | Margen |
+|----------|--------|-------|--------|
+| **Coca-Cola** | $1.50 | $0.85 | 65% |
+| **Sprite** | $1.40 | $0.80 | 60% |
+| **Fanta** | $1.35 | $0.75 | 64% |
+
+### 📊 KPIs Clave
+
+- **Capacidad Total/Mes:** 3,750,000 botellas
+- **Demanda Total/Mes:** 1,110,000 botellas
+- **Utilidad de Capacidad:** 29.6%
+- **Ingresos Potenciales/Mes:** $1,580,250
+- **Margen Potencial/Mes:** $636,750
 
 ---
 
@@ -34,102 +119,52 @@ Se implementaron manualmente todos los algoritmos para cumplir con los requerimi
 ### Requisitos Previos
 
 - Python 3.8+
-- pip (gestor de paquetes)
+- pip
 - virtualenv
-- ngrok (opcional, para acceso remoto)
+- ngrok (opcional)
 
 ### Paso 1: Crear Ambiente Virtual
-
 ```bash
-# Navegar al directorio del proyecto
+# Navegar al directorio
 cd jordiffs-proyecto_io
 
 # Crear ambiente virtual
 python -m venv venv
 
-# Activar ambiente virtual
-# En Windows:
+# Activar
+# Windows:
 venv\Scripts\activate
-
-# En Linux/Mac:
+# Linux/Mac:
 source venv/bin/activate
 ```
 
 ### Paso 2: Instalar Dependencias
-
 ```bash
-# Crear archivo requirements.txt
-pip install streamlit==1.28.1 numpy==1.24.3 pandas==1.5.3 pyngrok==7.0.1 scipy==1.11.2 matplotlib==3.7.2 seaborn==0.12.2 scikit-learn==1.3.0 python-dotenv==1.0.0
-
-# Verificar instalación
-pip list
+pip install -r requirements.txt
 ```
 
-### Paso 3: Descargar ngrok (Opcional)
+### Paso 3: Configurar Variables de Entorno
 
-Para acceso remoto a la aplicación:
+Crear archivo `.env`:
+```env
+GEMINI_API_KEY=tu_api_key_aqui
+HUGGING_FACE_API_KEY=tu_token_aqui
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=mistral
+NGROK_AUTH_TOKEN=tu_token_ngrok_aqui
+```
 
-**Windows:**
+### Paso 4: Instalar Ollama (Opcional)
 ```bash
-choco install ngrok
-```
+# Windows
+choco install ollama
+ollama pull mistral
+ollama serve
 
-**Linux/Mac:**
-```bash
-brew install ngrok
-```
-
-O descargar desde: https://ngrok.com/download
-
----
-
-## 📁 Estructura del Proyecto
-
-```
-jordiffs-proyecto_io/
-├── README.md                          # Este archivo
-├── app.py                             # Aplicación principal Streamlit
-├── run_ngrok.py                       # Script para ejecutar con ngrok
-├── requirements.txt                   # Dependencias Python
-│
-├── models/                            # Modelos de Optimización
-│   ├── __init__.py
-│   ├── programacion_lineal/
-│   │   ├── __init__.py
-│   │   ├── simplex.py                 # ✅ Implementado
-│   │   ├── dos_fases.py
-│   │   ├── gran_m.py
-│   │   └── dual.py
-│   ├── transporte/
-│   │   ├── __init__.py
-│   │   ├── esquina_noroeste.py        # ✅ Implementado
-│   │   ├── costo_minimo.py
-│   │   ├── vogel.py
-│   │   └── optimalidad.py
-│   ├── redes/
-│   │   ├── __init__.py
-│   │   ├── ruta_corta.py              # ✅ Implementado (Dijkstra)
-│   │   ├── arbol_minimo.py
-│   │   ├── flujo_maximo.py
-│   │   └── flujo_costo_minimo.py
-│   └── inventarios/
-│       ├── __init__.py
-│       └── inventario_basico.py       # ✅ Implementado (EOQ)
-│
-├── ia/                                # Análisis de Sensibilidad
-│   ├── __init__.py
-│   └── analisis_sensibilidad.py       # ✅ Implementado
-│
-├── empresa/                           # Caso Empresarial
-│   ├── __init__.py
-│   ├── caso_empresarial.py            # ✅ Implementado
-│   └── datos_empresa.py
-│
-├── utils/                             # Utilidades
-│   ├── __init__.py
-│   └── validaciones.py
-│
-└── venv/                              # Ambiente virtual (local)
+# Linux/Mac
+brew install ollama
+ollama pull mistral
+ollama serve
 ```
 
 ---
@@ -137,364 +172,230 @@ jordiffs-proyecto_io/
 ## 🎮 Uso de la Aplicación
 
 ### Ejecución Local
-
 ```bash
-# Modo 1: Ejecutar directamente con streamlit
 streamlit run app.py
-
-# La aplicación se abrirá en:
 # http://localhost:8501
 ```
 
-### Ejecución con ngrok (Acceso Remoto)
-
+### Ejecución con ngrok
 ```bash
-# Modo 1: Con script helper
 python run_ngrok.py --ngrok
-
-# Modo 2: Con token de ngrok
-python run_ngrok.py --ngrok --token=<tu_token_ngrok>
-
-# Modo 3: Especificar puerto personalizado
-python run_ngrok.py --ngrok --puerto=8502
 ```
 
-La URL pública se mostrará en la consola y en el panel de ngrok (http://localhost:4040).
+---
+
+## 📁 Estructura del Proyecto
+```
+jordiffs-proyecto_io/
+├── README.md
+├── GUIA_RAPIDA.md
+├── CASO_EMPRESA.md
+├── app.py
+├── run_ngrok.py
+├── requirements.txt
+├── .env
+│
+├── models/
+│   ├── programacion_lineal/
+│   │   ├── simplex.py
+│   │   ├── dos_fases.py
+│   │   ├── gran_m.py
+│   │   └── dual.py
+│   ├── transporte/
+│   │   ├── esquina_noroeste.py
+│   │   ├── costo_minimo.py
+│   │   ├── vogel.py
+│   │   └── optimalidad.py
+│   ├── redes/
+│   │   ├── ruta_corta.py
+│   │   ├── arbol_minimo.py
+│   │   ├── flujo_maximo.py
+│   │   └── flujo_costo_minimo.py
+│   └── inventarios/
+│       └── inventario_basico.py
+│
+├── views/
+│   ├── resolucion_simplex.py
+│   ├── resolucion_gran_m.py
+│   ├── resolucion_dos_fases.py
+│   ├── resolucion_dual.py
+│   ├── resolucion_esquina_noroeste.py
+│   ├── resolucion_costo_minimo_transporte.py
+│   ├── resolucion_vogel.py
+│   ├── resolucion_optimalidad.py
+│   ├── resolucion_ruta_mas_corta.py
+│   ├── resolucion_arbol_expansion_minima.py
+│   ├── resolucion_flujo_maximo.py
+│   ├── resolucion_costo_minimo.py
+│   └── resolucion_inventario.py
+│
+├── ia/
+│   ├── gemini.py
+│   ├── huggingface_analisis_pl.py
+│   ├── ollama_analisis_pl.py
+│   └── analisis_sensibilidad.py
+│
+├── empresa/
+│   ├── caso_empresarial.py
+│   └── datos_empresa.py
+│
+├── utils/
+│   └── validaciones.py
+│
+└── venv/
+```
 
 ---
 
 ## 📊 Módulos Implementados
 
 ### 1. Programación Lineal - Simplex
-
 ```python
 from models.programacion_lineal.simplex import Simplex
 
-# Crear problema
-c = [3, 2]  # Coeficientes función objetivo
-A = [[1, 1], [2, 1]]  # Matriz de restricciones
-b = [10, 15]  # Lados derechos
+c = [0.65, 0.60, 0.60]
+A = [[1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 0, 0], [0, 1, 0], [0, 0, 1]]
+b = [1500000, 1350000, 900000, 450000, 300000, 360000]
 
-simplex = Simplex(c, A, b, tipo="max")
+simplex = Simplex(c, A, b, tipo="max", nombres_vars=["Coca-Cola", "Sprite", "Fanta"])
 resultado = simplex.resolver()
 
-print(f"Valor Óptimo: {resultado['valor_optimo']}")
-print(f"Solución: {resultado['solucion']}")
+print(f"Valor Óptimo: ${resultado['valor_optimo']:.2f}")
 ```
 
-**Características:**
-- Regla de Dantzig para seleccionar variable entrante
-- Método de razones mínimas para variable saliente
-- Pivoteo completo
-- Detección de soluciones no acotadas
-
 ### 2. Problemas de Transporte - Esquina Noroeste
-
 ```python
 from models.transporte.esquina_noroeste import EsquinaNoreste
 
-costos = [[2, 3, 1, 5], [6, 5, 3, 2], [1, 2, 5, 4]]
-oferta = [50, 60, 40]
-demanda = [30, 40, 35, 45]
+costos = [[0.05, 0.15, 0.08], [0.15, 0.05, 0.12], [0.08, 0.12, 0.04]]
+oferta = [1500000, 1350000, 900000]
+demanda = [500000, 450000, 250000]
 
-transporte = EsquinaNoreste(costos, oferta, demanda)
-resultado = transporte.resolver()
+esquina = EsquinaNoreste(costos, oferta, demanda)
+resultado = esquina.resolver()
 
 print(f"Costo Total: ${resultado['costo_total']:.2f}")
 ```
 
-**Características:**
-- Balanceo automático (ficticio si oferta ≠ demanda)
-- Variables básicas: m + n - 1
-- Matriz de asignación detallada
-
 ### 3. Problemas de Redes - Dijkstra
-
 ```python
 from models.redes.ruta_corta import RutaMasCorta
 
-distancias = [
-    [0, 4, 2, float('inf')],
-    [float('inf'), 0, 1, 5],
-    [float('inf'), float('inf'), 0, 8],
-    [float('inf'), float('inf'), float('inf'), 0]
-]
+distancias = [[0, 0.05, 0.15, 0.08], [0.05, 0, 0.15, 0.12], [0.15, 0.15, 0, 0.12], [0.08, 0.12, 0.12, 0]]
 
-dijkstra = RutaMasCorta(distancias, nodos=['A', 'B', 'C', 'D'])
+dijkstra = RutaMasCorta(distancias, nodos=['Planta_Quito', 'Centro_Quito', 'Centro_Guayaquil', 'Centro_Cuenca'])
 resultado = dijkstra.resolver(nodo_origen=0)
 
-print(f"Ruta hacia C: {resultado['rutas'][2]['ruta']}")
+for ruta in resultado['rutas']:
+    print(f"{ruta['destino']}: {ruta['distancia']} km")
 ```
 
-**Características:**
-- Implementación con cola de prioridad (heap)
-- Reconstrucción de rutas
-- Tabla de resultados ordenada
-
-### 4. Análisis de Sensibilidad IA
-
+### 4. Gestión de Inventarios - EOQ
 ```python
-from ia.analisis_sensibilidad import AnalisisSensibilidad
+from models.inventarios.inventario_basico import ModeloEOQ
 
-solucion_base = {'valor_optimo': 150.0}
-sensibilidad = AnalisisSensibilidad(solucion_base)
+demanda_anual = 3650000
+costo_orden = 50
+costo_mantener = 0.02
 
-# Analizar coeficientes
-resultado = sensibilidad.analizar_coeficientes([3, 2], rango_variacion=0.2)
+eoq = ModeloEOQ(demanda_anual, costo_orden, costo_mantener)
+resultado = eoq.calcular()
 
-for rec in resultado['recomendaciones']:
-    print(rec)
+print(f"EOQ: {resultado['eoq']:.0f} botellas")
 ```
 
-**Características:**
-- Análisis de rango de coeficientes
-- Precio sombra de restricciones
-- Recomendaciones automáticas
-- Identificación de parámetros críticos
+### 5. Análisis de Sensibilidad IA
+```python
+from ia.gemini import generar_analisis_gemini
+from ia.huggingface_analisis_pl import generar_analisis_huggingface
+from ia.ollama_analisis_pl import generar_analisis_ollama
 
-### 5. Caso Empresarial Integral
+# Análisis con Gemini
+analisis_gemini = generar_analisis_gemini(
+    origen="Simplex",
+    rutas=[{"destino": "Coca-Cola", "distancia": 450000, "ruta": "Coca-Cola"}],
+    iteraciones=3,
+    total_nodos=9
+)
 
+# Análisis con Hugging Face
+analisis_hf = generar_analisis_huggingface(...)
+
+# Análisis con Ollama
+analisis_ollama = generar_analisis_ollama(...)
+```
+
+### 6. Caso Empresarial Integral
 ```python
 from empresa.caso_empresarial import CasoEmpresarial
 
 caso = CasoEmpresarial()
+kpis = caso.calcular_indicadores_clave()
 
-# Ejecutar análisis completo
-resultados = caso.ejecutar_analisis_completo()
-
-# Generar reportes
-print(caso.exportar_reporte_texto())
-caso.exportar_reporte_json('reporte.json')
+print(f"Capacidad: {kpis['capacidad_total_plantas']:,.0f}")
+print(f"Demanda: {kpis['demanda_total_mensual']:,.0f}")
 ```
-
-**Integra:**
-- Optimización de producción (PL)
-- Optimización de distribución (Transporte)
-- Gestión de inventarios (EOQ)
-- Ruta más eficiente (Redes)
 
 ---
 
 ## 🌐 Interfaz Streamlit
 
-### Secciones Disponibles
+### Secciones
 
-1. **🏠 Inicio**
-   - Descripción del sistema
-   - Características principales
-
-2. **📈 Programación Lineal**
-   - Ingresar problema personalizado
-   - Seleccionar método (Simplex, etc.)
-   - Visualizar tabla del simplex
-
-3. **🚚 Problemas de Transporte**
-   - Matriz de costos
-   - Oferta y demanda
-   - Matriz de asignación resultado
-
-4. **🌐 Problemas de Redes**
-   - Seleccionar tipo de problema
-   - Matriz de distancias
-   - Visualización de ruta óptima
-
-5. **📦 Gestión de Inventarios**
-   - Cálculo de EOQ
-   - Parámetros de inventario
-
-6. **🏢 Caso Empresarial Integral**
-   - Análisis completo de "TechOptimize S.A."
-   - Tabs con cada módulo
-   - Resumen ejecutivo
-
-7. **🤖 Análisis de Sensibilidad IA**
-   - Seleccionar parámetro a analizar
-   - Rango de variación
-   - Recomendaciones automáticas
-
-8. **📊 Historial de Resultados**
-   - Registro de análisis realizados
-   - Exportación de datos
+1. **🏠 Inicio** - Descripción y características
+2. **📈 Programación Lineal** - Simplex, Gran M, Dos Fases, Dual
+3. **🚚 Transporte** - Esquina Noroeste, Costo Mínimo, Vogel, MODI
+4. **🌐 Redes** - Dijkstra, Kruskal, Ford-Fulkerson, Costo Mínimo
+5. **📦 Inventarios** - EOQ y gestión de stock
+6. **🏭 Caso Coca-Cola** - Análisis empresarial completo
+7. **🤖 Análisis IA** - Sensibilidad con múltiples IAs
+8. **📊 Reportes** - Histórico y exportación
 
 ---
 
 ## 📐 Modelos Matemáticos
 
-### Programación Lineal - Forma Estándar
-
+### Programación Lineal
 ```
 max/min: c^T * x
 s.a:     A * x <= b
          x >= 0
 ```
 
-**Método Simplex:**
-- Conversión a forma canónica con variables de holgura
-- Tabla simplex inicial con base identidad
-- Iteraciones hasta condición de optimalidad
-
 ### Problema de Transporte
-
 ```
 min: Σ Σ c_ij * x_ij
-
-s.a: Σ_j x_ij = o_i  (oferta)
-     Σ_i x_ij = d_j  (demanda)
+s.a: Σ_j x_ij = o_i
+     Σ_i x_ij = d_j
      x_ij >= 0
 ```
 
-**Esquina Noroeste:**
-- Variables básicas: m + n - 1
-- Comienza desde esquina superior izquierda
-- Genera solución inicial viable
-
-### Ruta Más Corta - Dijkstra
-
-```
-Entrada: Grafo con pesos positivos
-Salida: Distancia mínima desde origen a todos los nodos
-
-Complejidad: O(V log V) con heap binaria
-```
-
-### Economic Order Quantity (EOQ)
-
+### EOQ
 ```
 EOQ = √(2*D*K / h)
-
-Donde:
-D = Demanda anual
-K = Costo de ordenar por orden
-h = Costo de mantener por unidad por año
+Costo Total = (D/EOQ)*K + (EOQ/2)*h
 ```
-
----
-
-## 🔬 Validación y Testing
-
-### Caso de Prueba: Programación Lineal
-
-```
-max: 3x₁ + 2x₂
-s.a: x₁ + x₂ ≤ 10
-     2x₁ + x₂ ≤ 15
-     x₁, x₂ ≥ 0
-
-Solución Esperada:
-x₁ = 5, x₂ = 5
-Z = 25
-```
-
-### Caso de Prueba: Transporte
-
-```
-3 orígenes, 4 destinos
-Oferta: [50, 60, 40]
-Demanda: [30, 40, 35, 45]
-
-Matriz de costos y asignación resultante
-```
-
----
-
-## 📈 Ejemplo de Caso Empresarial
-
-### "TechOptimize S.A." - Empresa Ficticia
-
-**Descripción:** Manufactura y distribución de componentes electrónicos
-
-**Productos:**
-- Procesador Dual Core: $45/unidad, máx 500 unidades, 2h producción
-- Tarjeta Memoria 8GB: $30/unidad, máx 800 unidades, 1.5h producción
-- Disco Sólido 256GB: $60/unidad, máx 300 unidades, 3h producción
-
-**Restricciones:**
-- 2000 horas disponibles/mes
-- 2 fábricas (Centro, Sur)
-- 4 centros de distribución
-- Demanda total: 1450 unidades/mes
-
-**Resultados del Análisis:**
-- Ganancia óptima: $37,850/mes
-- Costo de distribución: $2,890/mes
-- EOQ inventario: 482 unidades
-- Ruta eficiente: Centro A → B → D → C (870 km)
 
 ---
 
 ## 🛠️ Troubleshooting
 
-### Problema: `ModuleNotFoundError: No module named 'streamlit'`
+### Puerto en uso
+```bash
+streamlit run app.py --server.port=8502
+```
 
-**Solución:**
+### Falta módulo
 ```bash
 pip install streamlit==1.28.1
 ```
 
-### Problema: ngrok no se inicia
+### Gemini API
+1. Obtén key en https://makersuite.google.com
+2. Copia en `.env`
 
-**Solución:**
-1. Verificar que ngrok está instalado: `ngrok --version`
-2. Descargar desde https://ngrok.com/download
-3. O instalar con: `choco install ngrok` (Windows) o `brew install ngrok` (Mac)
-
-### Problema: Puerto 8501 ya está en uso
-
-**Solución:**
+### Ollama no conecta
 ```bash
-python run_ngrok.py --puerto=8502
+ollama serve
 ```
 
-### Problema: "Problema no acotado" en Simplex
-
-**Causas posibles:**
-- Falta restricción importante
-- Restricción con signo incorrecto
-- Problema mal formulado
-
----
-
-## 📚 Referencias y Bibliografía
-
-1. **Taha, Hamdy A.** - Investigación de Operaciones
-2. **Winston, Wayne L.** - Operations Research: Applications and Algorithms
-3. **Thie, Paul R.** - An Introduction to Linear Programming and Game Theory
-4. **Hillier & Lieberman** - Introduction to Operations Research
-
----
-
-## 👥 Información del Proyecto
-
-- **Asignatura:** Investigación Operativa
-- **Tipo:** Proyecto Final Integral
-- **Duración:** Semestre Académico
-- **Entregas:**
-  - ✅ Código fuente con documentación
-  - ✅ Modelamiento matemático
-  - ✅ Caso empresarial aplicado
-  - ✅ Análisis de resultados
-  - ✅ Presentación final
-
----
-
-## 📝 Licencia
-
-Proyecto académico. Uso permitido para fines educativos.
-
----
-
-## 📞 Contacto y Soporte
-
-Para preguntas o problemas con la implementación, consultar documentación interna de los módulos.
-
-```python
-# Obtener ayuda de cualquier módulo
-from models.programacion_lineal.simplex import Simplex
-help(Simplex)
-help(Simplex.resolver)
-```
-
----
-
-**Última actualización:** 2024
-**Versión:** 1.0.0
