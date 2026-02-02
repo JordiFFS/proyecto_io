@@ -1,13 +1,13 @@
-"""
-views/resolucion_arbol_expansion_minima.py
-Vista para Árbol de Expansión Mínima adaptada a Coca-Cola
-"""
-
+# views/resolucion_arbol_expansion_minima.py
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from models.redes.red import Red
 from models.redes.arbol_minimo import ArbolMinimo
+from models.redes.adaptadores import red_a_matriz_distancias
+from gemini import generar_analisis_gemini
+from huggingface_analisis_pl import generar_analisis_huggingface
+from ollama_analisis_pl import generar_analisis_ollama, verificar_ollama_disponible
 from empresa.datos_empresa import PLANTAS, CENTROS_DISTRIBUCION, COSTOS_TRANSPORTE_DISTRIBUCION
 
 
@@ -259,6 +259,84 @@ def mostrar_resolucion_arbol_minimo(resultado, nodos, aristas_originales):
         - Costo Total: ${resultado['costo_total']:.4f}
         - Iteraciones: {len(resultado['iteraciones'])}
         """)
+
+    # ==================================================
+    # 🤖 ANÁLISIS CON MÚLTIPLES IAS - AL FINAL
+    # ==================================================
+    st.write("---")
+    st.markdown("<h2 class='section-header'>📊 Análisis Comparativo con IA</h2>", unsafe_allow_html=True)
+    st.info("⏳ Generando análisis con Gemini, Hugging Face y Ollama para comparación...")
+
+    # Contenedor para los análisis
+    analisis_container = st.container()
+
+    # Generar análisis con las tres IAs
+    analisis_data = {}
+
+    # GEMINI
+    with st.spinner("🤖 Generando análisis con Gemini..."):
+        try:
+            rutas_texto = ""
+            for i, (u, v, costo) in enumerate(resultado['arbol']):
+                rutas_texto += f"- Arista {i+1}: {u} ↔ {v}, Costo: ${costo:.4f}\n"
+
+            analisis_data['gemini'] = generar_analisis_gemini(
+                origen="Árbol de Expansión Mínima",
+                rutas=[{"destino": f"{u}↔{v}", "distancia": costo, "ruta": f"{u}-{v}"}
+                       for u, v, costo in resultado['arbol']],
+                iteraciones=len(resultado['iteraciones']),
+                total_nodos=len(nodos)
+            )
+        except Exception as e:
+            analisis_data['gemini'] = f"❌ Error: {str(e)}"
+
+    # HUGGING FACE
+    with st.spinner("🧠 Generando análisis con Hugging Face..."):
+        try:
+            analisis_data['huggingface'] = generar_analisis_huggingface(
+                origen="Árbol de Expansión Mínima",
+                rutas=[{"destino": f"{u}↔{v}", "distancia": costo, "ruta": f"{u}-{v}"}
+                       for u, v, costo in resultado['arbol']],
+                iteraciones=len(resultado['iteraciones']),
+                total_nodos=len(nodos)
+            )
+        except Exception as e:
+            analisis_data['huggingface'] = f"❌ Error: {str(e)}"
+
+    # OLLAMA
+    with st.spinner("💻 Generando análisis con Ollama..."):
+        try:
+            analisis_data['ollama'] = generar_analisis_ollama(
+                origen="Árbol de Expansión Mínima",
+                rutas=[{"destino": f"{u}↔{v}", "distancia": costo, "ruta": f"{u}-{v}"}
+                       for u, v, costo in resultado['arbol']],
+                iteraciones=len(resultado['iteraciones']),
+                total_nodos=len(nodos)
+            )
+        except Exception as e:
+            analisis_data['ollama'] = f"❌ Error: {str(e)}"
+
+    # Mostrar análisis en pestañas
+    with analisis_container:
+        st.success("✅ Análisis Completados")
+
+        tab1, tab2, tab3 = st.tabs([
+            "🤖 Gemini",
+            "🧠 Hugging Face",
+            "💻 Ollama"
+        ])
+
+        with tab1:
+            st.markdown("### 🤖 Análisis Gemini")
+            st.write(analisis_data.get('gemini', 'Sin análisis disponible'))
+
+        with tab2:
+            st.markdown("### 🧠 Análisis Hugging Face")
+            st.write(analisis_data.get('huggingface', 'Sin análisis disponible'))
+
+        with tab3:
+            st.markdown("### 💻 Análisis Ollama")
+            st.write(analisis_data.get('ollama', 'Sin análisis disponible'))
 
 
 def ejemplo_arbol_minimo():

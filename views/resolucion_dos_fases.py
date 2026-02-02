@@ -1,6 +1,10 @@
+# views/resolucion_dos_fases.py
 import streamlit as st
 import pandas as pd
 from models.programacion_lineal.dos_fases import DosFases
+from gemini import generar_analisis_gemini
+from huggingface_analisis_pl import generar_analisis_huggingface
+from ollama_analisis_pl import generar_analisis_ollama, verificar_ollama_disponible
 
 
 def ejemplo_dos_fases_coca_cola():
@@ -30,11 +34,11 @@ def ejemplo_dos_fases_coca_cola():
     if st.button("Ejecutar Ejemplo Dos Fases (Coca-Cola)", key="ej_dos_fases_coca"):
         c = [0.05, 0.15, 0.12]
         A = [
-            [1, 1, 0],  # x₁ + x₂ ≤ 1,500,000
-            [0, 0, 1],  # x₃ ≥ 0 (esto es -x₃ ≤ 0)
-            [1, 0, 0],  # x₁ ≥ 300,000
-            [0, 1, 0],  # x₂ ≥ 200,000
-            [0, 0, 1],  # x₃ ≤ 500,000
+            [1, 1, 0],
+            [0, 0, 1],
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
         ]
 
         b = [1500000, 0, 300000, 200000, 500000]
@@ -94,7 +98,6 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
     else:
         st.error("❌ Error en la resolución")
 
-    # MOSTRAR CONFIGURACIÓN
     st.write("---")
     st.markdown("<h2 class='section-header'>✅ Configuración del Problema</h2>", unsafe_allow_html=True)
 
@@ -108,7 +111,6 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
     with col4:
         st.metric("🔄 Iteraciones Fase 2", resultado['iteraciones_fase2'])
 
-    # FASE 1
     st.write("---")
     st.markdown("<h2 class='section-header'>📍 FASE 1: Encontrar Solución Básica Factible</h2>", unsafe_allow_html=True)
 
@@ -147,7 +149,6 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
                             st.subheader("📊 Tabla Actualizada")
                             st.dataframe(iter_info['tabla'], use_container_width=True)
 
-    # FASE 2
     st.write("---")
     st.markdown("<h2 class='section-header'>📈 FASE 2: Optimizar Función Objetivo Original</h2>", unsafe_allow_html=True)
 
@@ -186,7 +187,6 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
                             st.subheader("📊 Tabla Actualizada")
                             st.dataframe(iter_info['tabla'], use_container_width=True)
 
-    # SOLUCIÓN FINAL
     st.write("---")
     st.markdown("<h2 class='section-header'>🏆 SOLUCIÓN ÓPTIMA FINAL</h2>", unsafe_allow_html=True)
 
@@ -201,7 +201,6 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
     with col4:
         st.metric("📦 Estado", resultado.get('estado', 'N/A'))
 
-    # VARIABLES DE DECISIÓN
     st.subheader("✅ Variables de Decisión Óptimas")
     var_data = []
     for var in nombres:
@@ -215,7 +214,6 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
     var_df = pd.DataFrame(var_data)
     st.dataframe(var_df, use_container_width=True, hide_index=True)
 
-    # RESUMEN
     st.write("---")
     st.markdown("<h2 class='section-header'>📊 Resumen Ejecutivo</h2>", unsafe_allow_html=True)
 
@@ -239,3 +237,70 @@ def mostrar_resolucion_dos_fases(resultado, nombres, n_vars, n_rest, tipo_opt):
         - Variables Básicas: {', '.join([x for x in resultado.get('base_final', []) if x.startswith('x')])}
         - Estado: {resultado.get('estado', 'N/A')}
         """)
+
+    # ==================================================
+    # 🤖 ANÁLISIS CON MÚLTIPLES IAS - AL FINAL
+    # ==================================================
+    st.write("---")
+    st.markdown("<h2 class='section-header'>📊 Análisis Comparativo con IA</h2>", unsafe_allow_html=True)
+    st.info("⏳ Generando análisis con Gemini, Hugging Face y Ollama para comparación...")
+
+    analisis_container = st.container()
+    analisis_data = {}
+
+    with st.spinner("🤖 Generando análisis con Gemini..."):
+        try:
+            analisis_data['gemini'] = generar_analisis_gemini(
+                origen=f"Dos Fases {tipo_opt}",
+                rutas=[{"destino": nombres[i], "distancia": resultado['solucion_variables'].get(nombres[i], 0),
+                        "ruta": nombres[i]} for i in range(len(nombres))],
+                iteraciones=resultado['iteraciones'],
+                total_nodos=n_vars + n_rest
+            )
+        except Exception as e:
+            analisis_data['gemini'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("🧠 Generando análisis con Hugging Face..."):
+        try:
+            analisis_data['huggingface'] = generar_analisis_huggingface(
+                origen=f"Dos Fases {tipo_opt}",
+                rutas=[{"destino": nombres[i], "distancia": resultado['solucion_variables'].get(nombres[i], 0),
+                        "ruta": nombres[i]} for i in range(len(nombres))],
+                iteraciones=resultado['iteraciones'],
+                total_nodos=n_vars + n_rest
+            )
+        except Exception as e:
+            analisis_data['huggingface'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("💻 Generando análisis con Ollama..."):
+        try:
+            analisis_data['ollama'] = generar_analisis_ollama(
+                origen=f"Dos Fases {tipo_opt}",
+                rutas=[{"destino": nombres[i], "distancia": resultado['solucion_variables'].get(nombres[i], 0),
+                        "ruta": nombres[i]} for i in range(len(nombres))],
+                iteraciones=resultado['iteraciones'],
+                total_nodos=n_vars + n_rest
+            )
+        except Exception as e:
+            analisis_data['ollama'] = f"❌ Error: {str(e)}"
+
+    with analisis_container:
+        st.success("✅ Análisis Completados")
+
+        tab1, tab2, tab3 = st.tabs([
+            "🤖 Gemini",
+            "🧠 Hugging Face",
+            "💻 Ollama"
+        ])
+
+        with tab1:
+            st.markdown("### 🤖 Análisis Gemini")
+            st.write(analisis_data.get('gemini', 'Sin análisis disponible'))
+
+        with tab2:
+            st.markdown("### 🧠 Análisis Hugging Face")
+            st.write(analisis_data.get('huggingface', 'Sin análisis disponible'))
+
+        with tab3:
+            st.markdown("### 💻 Análisis Ollama")
+            st.write(analisis_data.get('ollama', 'Sin análisis disponible'))

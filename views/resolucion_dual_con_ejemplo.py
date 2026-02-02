@@ -1,6 +1,10 @@
+# views/resolucion_dual.py
 import streamlit as st
 import pandas as pd
 from models.programacion_lineal.dual import Dual
+from gemini import generar_analisis_gemini
+from huggingface_analisis_pl import generar_analisis_huggingface
+from ollama_analisis_pl import generar_analisis_ollama, verificar_ollama_disponible
 
 
 def ejemplo_dual_coca_cola():
@@ -61,7 +65,6 @@ def ejemplo_dual_coca_cola():
         if resultado['primal']['exito'] and resultado['dual']['exito']:
             st.success("✅ Análisis Primal-Dual completado exitosamente")
 
-            # Mostrar comparación
             st.write("---")
             st.subheader("📊 Comparación Primal vs Dual")
 
@@ -106,33 +109,8 @@ def ejemplo_dual_coca_cola():
                     dual_df = pd.DataFrame(dual_data)
                     st.dataframe(dual_df, use_container_width=True, hide_index=True)
 
-            # Verificación de Dualidad Fuerte
             st.write("---")
-            st.subheader("🔍 Verificación de Dualidad Fuerte")
-
-            if resultado['dualidad_fuerte']:
-                st.success("✅ DUALIDAD FUERTE VERIFICADA")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Z Primal", f"${resultado['primal']['valor_optimo']:,.2f}")
-                with col2:
-                    st.metric("Z Dual", f"${resultado['dual']['valor_optimo']:,.2f}")
-                with col3:
-                    st.metric("Diferencia", f"{resultado['diferencia_valores_optimos']:.2e}")
-
-                st.write("""
-                ✓ Los valores óptimos son iguales (dentro de tolerancia numérica).
-                ✓ Esto confirma que ambos problemas tienen soluciones óptimas equivalentes.
-                """)
-            else:
-                st.warning("⚠️ Verificación incompleta de dualidad fuerte")
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Z Primal", f"${resultado['primal']['valor_optimo']:,.2f}")
-                with col2:
-                    st.metric("Z Dual", f"${resultado['dual']['valor_optimo']:,.2f}")
-                with col3:
-                    st.metric("Diferencia", f"{resultado['diferencia_valores_optimos']:.2e}")
+            mostrar_resolucion_dual(resultado)
 
         else:
             if not resultado['primal']['exito']:
@@ -173,7 +151,6 @@ def mostrar_resolucion_dual(resultado):
 
     st.write("---")
 
-    # SOLUCIONES
     st.markdown("<h2 class='section-header'>✅ Soluciones</h2>", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
@@ -242,7 +219,6 @@ def mostrar_resolucion_dual(resultado):
 
     st.write("---")
 
-    # VERIFICACIÓN DE DUALIDAD FUERTE
     st.markdown("<h2 class='section-header'>🔍 Verificación de Dualidad Fuerte</h2>", unsafe_allow_html=True)
 
     if resultado['dualidad_fuerte']:
@@ -282,7 +258,6 @@ def mostrar_resolucion_dual(resultado):
 
     st.write("---")
 
-    # TEORÍA DE DUALIDAD
     st.markdown("<h2 class='section-header'>📚 Información de Dualidad</h2>", unsafe_allow_html=True)
 
     st.write("""
@@ -306,7 +281,6 @@ def mostrar_resolucion_dual(resultado):
 
     st.write("---")
 
-    # RESUMEN EJECUTIVO
     st.markdown("<h2 class='section-header'>📊 Resumen Ejecutivo</h2>", unsafe_allow_html=True)
 
     summary_col1, summary_col2 = st.columns(2)
@@ -328,3 +302,70 @@ def mostrar_resolucion_dual(resultado):
         - Iteraciones Primal: {resultado['primal']['iteraciones']}
         - Iteraciones Dual: {resultado['dual']['iteraciones']}
         """)
+
+    # ==================================================
+    # 🤖 ANÁLISIS CON MÚLTIPLES IAS - AL FINAL
+    # ==================================================
+    st.write("---")
+    st.markdown("<h2 class='section-header'>📊 Análisis Comparativo con IA</h2>", unsafe_allow_html=True)
+    st.info("⏳ Generando análisis con Gemini, Hugging Face y Ollama para comparación...")
+
+    analisis_container = st.container()
+    analisis_data = {}
+
+    with st.spinner("🤖 Generando análisis con Gemini..."):
+        try:
+            analisis_data['gemini'] = generar_analisis_gemini(
+                origen="Dualidad",
+                rutas=[{"destino": f"Var_{i}", "distancia": resultado['primal']['valor_optimo'], "ruta": f"Var_{i}"} for
+                       i in range(3)],
+                iteraciones=resultado['primal']['iteraciones'] + resultado['dual']['iteraciones'],
+                total_nodos=len(resultado['nombres_vars_primal']) + len(resultado['nombres_vars_dual'])
+            )
+        except Exception as e:
+            analisis_data['gemini'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("🧠 Generando análisis con Hugging Face..."):
+        try:
+            analisis_data['huggingface'] = generar_analisis_huggingface(
+                origen="Dualidad",
+                rutas=[{"destino": f"Var_{i}", "distancia": resultado['primal']['valor_optimo'], "ruta": f"Var_{i}"} for
+                       i in range(3)],
+                iteraciones=resultado['primal']['iteraciones'] + resultado['dual']['iteraciones'],
+                total_nodos=len(resultado['nombres_vars_primal']) + len(resultado['nombres_vars_dual'])
+            )
+        except Exception as e:
+            analisis_data['huggingface'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("💻 Generando análisis con Ollama..."):
+        try:
+            analisis_data['ollama'] = generar_analisis_ollama(
+                origen="Dualidad",
+                rutas=[{"destino": f"Var_{i}", "distancia": resultado['primal']['valor_optimo'], "ruta": f"Var_{i}"} for
+                       i in range(3)],
+                iteraciones=resultado['primal']['iteraciones'] + resultado['dual']['iteraciones'],
+                total_nodos=len(resultado['nombres_vars_primal']) + len(resultado['nombres_vars_dual'])
+            )
+        except Exception as e:
+            analisis_data['ollama'] = f"❌ Error: {str(e)}"
+
+    with analisis_container:
+        st.success("✅ Análisis Completados")
+
+        tab1, tab2, tab3 = st.tabs([
+            "🤖 Gemini",
+            "🧠 Hugging Face",
+            "💻 Ollama"
+        ])
+
+        with tab1:
+            st.markdown("### 🤖 Análisis Gemini")
+            st.write(analisis_data.get('gemini', 'Sin análisis disponible'))
+
+        with tab2:
+            st.markdown("### 🧠 Análisis Hugging Face")
+            st.write(analisis_data.get('huggingface', 'Sin análisis disponible'))
+
+        with tab3:
+            st.markdown("### 💻 Análisis Ollama")
+            st.write(analisis_data.get('ollama', 'Sin análisis disponible'))

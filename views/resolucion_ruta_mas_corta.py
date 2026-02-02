@@ -1,12 +1,13 @@
+# resolucion_ruta_mas_corta.py - ACTUALIZADO
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
 from models.redes.red import Red
 from models.redes.ruta_corta import RutaMasCorta
 from models.redes.adaptadores import red_a_matriz_distancias
-from gemini_pruebas import generar_analisis_gemini
-from transformers_pruebas import generar_analisis
+from gemini import generar_analisis_gemini
+from huggingface_analisis_pl import generar_analisis_huggingface
+from ollama_analisis_pl import generar_analisis_ollama, verificar_ollama_disponible
 
 
 def crear_grafo_red(red, resultado, origen):
@@ -16,7 +17,6 @@ def crear_grafo_red(red, resultado, origen):
     """
     fig = go.Figure()
 
-    # Posiciones predefinidas para visualización
     posiciones = {
         "Planta_Quito": (0, 2),
         "Planta_Guayaquil": (0, 1),
@@ -32,7 +32,6 @@ def crear_grafo_red(red, resultado, origen):
         "TiendaMinorista2": (3, 2.4),
     }
 
-    # Agregar arcos
     for arco in red.arcos:
         origen_arco = arco["origen"]
         destino_arco = arco["destino"]
@@ -41,8 +40,7 @@ def crear_grafo_red(red, resultado, origen):
             x0, y0 = posiciones[origen_arco]
             x1, y1 = posiciones[destino_arco]
 
-            # Determinar color basado si está en ruta óptima
-            color = "#444444"  # Gris oscuro para arcos normales
+            color = "#444444"
             ancho = 1.5
 
             for ruta in resultado["rutas"]:
@@ -50,7 +48,7 @@ def crear_grafo_red(red, resultado, origen):
                     ruta_nodos = ruta["ruta"].split(" → ")
                     for i in range(len(ruta_nodos) - 1):
                         if ruta_nodos[i] == origen_arco and ruta_nodos[i + 1] == destino_arco:
-                            color = "#FF6B6B"  # Rojo brillante para rutas óptimas
+                            color = "#FF6B6B"
                             ancho = 3
                             break
 
@@ -63,18 +61,16 @@ def crear_grafo_red(red, resultado, origen):
                 showlegend=False
             ))
 
-    # Agregar nodos
     colores_nodo = {
-        "planta": "#4169E1",  # Azul real
-        "distribucion": "#32CD32",  # Verde lima
-        "venta": "#FFB84D"  # Naranja
+        "planta": "#4169E1",
+        "distribucion": "#32CD32",
+        "venta": "#FFB84D"
     }
 
     for nodo, (x, y) in posiciones.items():
         tipo = red.tipos_nodo.get(nodo, "desconocido")
         color = colores_nodo.get(tipo, "#808080")
 
-        # Destacar origen con borde más grueso
         tamano = 35 if nodo == origen else 25
         if nodo == origen:
             borde_ancho = 3
@@ -118,14 +114,13 @@ def crear_grafo_red(red, resultado, origen):
             showticklabels=False,
             range=[-0.5, 2.8]
         ),
-        plot_bgcolor="#1a1a1a",  # Fondo gris muy oscuro
-        paper_bgcolor="#0d0d0d",  # Fondo aún más oscuro
+        plot_bgcolor="#1a1a1a",
+        paper_bgcolor="#0d0d0d",
         font=dict(color="white"),
         height=700,
         margin=dict(b=50, l=50, r=50, t=100)
     )
 
-    # Agregar leyenda manual
     colores_leyenda = [
         ("Planta", "#4169E1"),
         ("Distribución", "#32CD32"),
@@ -153,7 +148,6 @@ def mostrar_resolucion_ruta_corta(resultado, iteraciones, nodos, matriz, origen,
 
     st.success("✅ Ruta Más Corta Calculada Exitosamente")
 
-    # CONFIGURACIÓN DEL PROBLEMA
     st.write("---")
     st.markdown("<h2 class='section-header'>✅ Configuración del Problema</h2>", unsafe_allow_html=True)
 
@@ -167,7 +161,6 @@ def mostrar_resolucion_ruta_corta(resultado, iteraciones, nodos, matriz, origen,
     with col4:
         st.metric("🔍 Algoritmo", "Dijkstra")
 
-    # MATRIZ DE DISTANCIAS
     st.write("---")
     st.markdown("<h2 class='section-header'>📊 Matriz de Distancias</h2>", unsafe_allow_html=True)
 
@@ -179,7 +172,6 @@ def mostrar_resolucion_ruta_corta(resultado, iteraciones, nodos, matriz, origen,
     )
     st.dataframe(matriz_df, use_container_width=True)
 
-    # ITERACIONES DEL ALGORITMO
     st.write("---")
     st.markdown("<h2 class='section-header'>🔄 Iteraciones del Algoritmo Dijkstra</h2>",
                 unsafe_allow_html=True)
@@ -199,7 +191,6 @@ def mostrar_resolucion_ruta_corta(resultado, iteraciones, nodos, matriz, origen,
                             f"<div class='metric-box'><strong>Nodo Fijado:</strong><br>{iter_info['nodo_fijado']}</div>",
                             unsafe_allow_html=True)
 
-                # Mostrar distancias actuales
                 st.subheader("📏 Distancias Acumuladas")
                 dist_data = []
                 for nodo in nodos:
@@ -216,7 +207,6 @@ def mostrar_resolucion_ruta_corta(resultado, iteraciones, nodos, matriz, origen,
                 dist_df = pd.DataFrame(dist_data)
                 st.dataframe(dist_df, use_container_width=True, hide_index=True)
 
-                # Relajaciones en esta iteración
                 if iter_info['relajaciones']:
                     st.subheader("🔗 Relajaciones Realizadas")
                     relaj_data = []
@@ -234,7 +224,6 @@ def mostrar_resolucion_ruta_corta(resultado, iteraciones, nodos, matriz, origen,
                     relaj_df = pd.DataFrame(relaj_data)
                     st.dataframe(relaj_df, use_container_width=True, hide_index=True)
 
-    # SOLUCIÓN FINAL
     st.write("---")
     st.markdown("<h2 class='section-header'>🏆 SOLUCIÓN FINAL - RUTAS MÁS CORTAS</h2>",
                 unsafe_allow_html=True)
@@ -269,24 +258,6 @@ def mostrar_resolucion_ruta_corta(resultado, iteraciones, nodos, matriz, origen,
 
     rutas_df = pd.DataFrame(rutas_data)
     st.dataframe(rutas_df, use_container_width=True, hide_index=True)
-
-    # Generar un resumen de sensibilidad, conclusiones y recomendaciones basado en IA
-    st.write("---")
-    st.markdown("<h2 class='section-header'>📊 Resumen y Análisis con IA</h2>", unsafe_allow_html=True)
-
-    # ==================================================
-    # 🤖 ANÁLISIS CON GEMINI
-    # ==================================================
-    with st.spinner("Generando análisis académico con Gemini..."):
-        analisis_gemini = generar_analisis_gemini(
-            origen=origen,
-            rutas=resultado['rutas'],
-            iteraciones=len(iteraciones),
-            total_nodos=len(nodos)
-        )
-
-    st.markdown("### 🧠 Análisis académico (Gemini)")
-    st.write(analisis_gemini)
 
     # ÁRBOL DE PREDECESORES
     st.write("---")
@@ -332,6 +303,77 @@ def mostrar_resolucion_ruta_corta(resultado, iteraciones, nodos, matriz, origen,
     fig_red = crear_grafo_red(red, resultado, origen)
     st.plotly_chart(fig_red, use_container_width=True)
 
+    # ==================================================
+    # 🤖 ANÁLISIS CON MÚLTIPLES IAS - AL FINAL
+    # ==================================================
+    st.write("---")
+    st.markdown("<h2 class='section-header'>📊 Análisis Comparativo con IA</h2>", unsafe_allow_html=True)
+    st.info("⏳ Generando análisis con Gemini, Hugging Face y Ollama para comparación...")
+
+    # Contenedor para los análisis
+    analisis_container = st.container()
+
+    # Generar análisis con las tres IAs
+    analisis_data = {}
+
+    # GEMINI
+    with st.spinner("🤖 Generando análisis con Gemini..."):
+        try:
+            analisis_data['gemini'] = generar_analisis_gemini(
+                origen=origen,
+                rutas=resultado['rutas'],
+                iteraciones=len(iteraciones),
+                total_nodos=len(nodos)
+            )
+        except Exception as e:
+            analisis_data['gemini'] = f"❌ Error: {str(e)}"
+
+    # HUGGING FACE
+    with st.spinner("🧠 Generando análisis con Hugging Face..."):
+        try:
+            analisis_data['huggingface'] = generar_analisis_huggingface(
+                origen=origen,
+                rutas=resultado['rutas'],
+                iteraciones=len(iteraciones),
+                total_nodos=len(nodos)
+            )
+        except Exception as e:
+            analisis_data['huggingface'] = f"❌ Error: {str(e)}"
+
+    # OLLAMA
+    with st.spinner("💻 Generando análisis con Ollama..."):
+        try:
+            analisis_data['ollama'] = generar_analisis_ollama(
+                origen=origen,
+                rutas=resultado['rutas'],
+                iteraciones=len(iteraciones),
+                total_nodos=len(nodos)
+            )
+        except Exception as e:
+            analisis_data['ollama'] = f"❌ Error: {str(e)}"
+
+    # Mostrar análisis en pestañas
+    with analisis_container:
+        st.success("✅ Análisis Completados")
+
+        tab1, tab2, tab3 = st.tabs([
+            "🤖 Gemini",
+            "🧠 Hugging Face",
+            "💻 Ollama"
+        ])
+
+        with tab1:
+            st.markdown("### 🤖 Análisis Gemini")
+            st.write(analisis_data.get('gemini', 'Sin análisis disponible'))
+
+        with tab2:
+            st.markdown("### 🧠 Análisis Hugging Face")
+            st.write(analisis_data.get('huggingface', 'Sin análisis disponible'))
+
+        with tab3:
+            st.markdown("### 💻 Análisis Ollama")
+            st.write(analisis_data.get('ollama', 'Sin análisis disponible'))
+
 
 def ejemplo_ruta_corta_coca_cola():
     """Ejemplo de ruta más corta en red Coca-Cola"""
@@ -347,7 +389,6 @@ def ejemplo_ruta_corta_coca_cola():
     """)
 
     if st.button("Ejecutar Ejemplo Coca-Cola", key="ej_ruta_corta_coca"):
-        # Crear red
         nodos = [
             "Planta_Quito", "Planta_Guayaquil", "Planta_Cuenca",
             "Centro_Quito", "Centro_Guayaquil", "Centro_Cuenca",
@@ -358,7 +399,6 @@ def ejemplo_ruta_corta_coca_cola():
 
         red = Red(nodos)
 
-        # Clasificar nodos
         for nodo in ["Planta_Quito", "Planta_Guayaquil", "Planta_Cuenca"]:
             red.set_tipo_nodo(nodo, "planta")
 
@@ -369,7 +409,6 @@ def ejemplo_ruta_corta_coca_cola():
                      "TiendaDistribuidor2", "TiendaMinorista1", "TiendaMinorista2"]:
             red.set_tipo_nodo(nodo, "venta")
 
-        # Agregar arcos desde Planta Quito
         arcos_datos = [
             ("Planta_Quito", "Centro_Quito", 0.05),
             ("Planta_Quito", "Centro_Guayaquil", 0.15),
@@ -388,10 +427,8 @@ def ejemplo_ruta_corta_coca_cola():
         for origen_arco, destino, distancia in arcos_datos:
             red.agregar_arco(origen_arco, destino, costo=distancia, distancia=distancia)
 
-        # Resolver
         matriz, nodos_matriz = red_a_matriz_distancias(red)
         dijkstra = RutaMasCorta(matriz, nodos_matriz)
-        resultado = dijkstra.resolver(0)  # Índice de Planta_Quito
+        resultado = dijkstra.resolver(0)
 
-        # Mostrar
         mostrar_resolucion_ruta_corta(resultado, dijkstra.iteraciones, nodos_matriz, matriz, 'Planta_Quito', red)

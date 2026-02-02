@@ -1,13 +1,12 @@
-"""
-views/resolucion_costo_minimo.py
-Vista para Flujo de Costo Mínimo adaptada a Coca-Cola
-"""
-
+# views/resolucion_costo_minimo.py
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from models.redes.red import Red
 from models.redes.flujo_costo_minimo import FlujoCostoMinimo
+from gemini import generar_analisis_gemini
+from huggingface_analisis_pl import generar_analisis_huggingface
+from ollama_analisis_pl import generar_analisis_ollama, verificar_ollama_disponible
 from empresa.datos_empresa import CENTROS_DISTRIBUCION, PUNTOS_VENTA, COSTOS_TRANSPORTE_VENTA
 
 
@@ -286,6 +285,77 @@ def mostrar_resolucion_flujo_costo_minimo(resultado, origen, destino, flujo_requ
         - Costo Promedio: ${resultado.get('costo_promedio', 0):.2f}
         - Iteraciones: {len(resultado.get('iteraciones', []))}
         """)
+
+    # ==================================================
+    # 🤖 ANÁLISIS CON MÚLTIPLES IAS - AL FINAL
+    # ==================================================
+    st.write("---")
+    st.markdown("<h2 class='section-header'>📊 Análisis Comparativo con IA</h2>", unsafe_allow_html=True)
+    st.info("⏳ Generando análisis con Gemini, Hugging Face y Ollama para comparación...")
+
+    # Contenedor para los análisis
+    analisis_container = st.container()
+
+    # Generar análisis con las tres IAs
+    analisis_data = {}
+
+    # GEMINI
+    with st.spinner("🤖 Generando análisis con Gemini..."):
+        try:
+            analisis_data['gemini'] = generar_analisis_gemini(
+                origen=origen,
+                rutas=[{"destino": destino, "distancia": resultado.get('costo_total', 0), "ruta": f"{origen}→{destino}"}],
+                iteraciones=len(resultado.get('iteraciones', [])),
+                total_nodos=2
+            )
+        except Exception as e:
+            analisis_data['gemini'] = f"❌ Error: {str(e)}"
+
+    # HUGGING FACE
+    with st.spinner("🧠 Generando análisis con Hugging Face..."):
+        try:
+            analisis_data['huggingface'] = generar_analisis_huggingface(
+                origen=origen,
+                rutas=[{"destino": destino, "distancia": resultado.get('costo_total', 0), "ruta": f"{origen}→{destino}"}],
+                iteraciones=len(resultado.get('iteraciones', [])),
+                total_nodos=2
+            )
+        except Exception as e:
+            analisis_data['huggingface'] = f"❌ Error: {str(e)}"
+
+    # OLLAMA
+    with st.spinner("💻 Generando análisis con Ollama..."):
+        try:
+            analisis_data['ollama'] = generar_analisis_ollama(
+                origen=origen,
+                rutas=[{"destino": destino, "distancia": resultado.get('costo_total', 0), "ruta": f"{origen}→{destino}"}],
+                iteraciones=len(resultado.get('iteraciones', [])),
+                total_nodos=2
+            )
+        except Exception as e:
+            analisis_data['ollama'] = f"❌ Error: {str(e)}"
+
+    # Mostrar análisis en pestañas
+    with analisis_container:
+        st.success("✅ Análisis Completados")
+
+        tab1, tab2, tab3 = st.tabs([
+            "🤖 Gemini",
+            "🧠 Hugging Face",
+            "💻 Ollama"
+        ])
+
+        with tab1:
+            st.markdown("### 🤖 Análisis Gemini")
+            st.write(analisis_data.get('gemini', 'Sin análisis disponible'))
+
+        with tab2:
+            st.markdown("### 🧠 Análisis Hugging Face")
+            st.write(analisis_data.get('huggingface', 'Sin análisis disponible'))
+
+        with tab3:
+            st.markdown("### 💻 Análisis Ollama")
+            st.write(analisis_data.get('ollama', 'Sin análisis disponible'))
 
 
 def ejemplo_flujo_costo_minimo():

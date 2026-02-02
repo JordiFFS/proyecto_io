@@ -1,13 +1,12 @@
-"""
-views/resolucion_costo_minimo_transporte.py
-Vista para Costo Mínimo de Transporte adaptada a Coca-Cola
-"""
-
+# views/resolucion_costo_minimo_transporte.py
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from models.transporte.costo_minimo import CostoMinimo
+from gemini import generar_analisis_gemini
+from huggingface_analisis_pl import generar_analisis_huggingface
+from ollama_analisis_pl import generar_analisis_ollama, verificar_ollama_disponible
 from empresa.datos_empresa import (
     PLANTAS, CENTROS_DISTRIBUCION, COSTOS_TRANSPORTE_DISTRIBUCION,
     PUNTOS_VENTA, COSTOS_TRANSPORTE_VENTA, PARAMETROS_INVENTARIO
@@ -20,7 +19,6 @@ def crear_grafo_transporte(orígenes, destinos, asignacion, costos, nombres_orig
     """
     fig = go.Figure()
 
-    # Posiciones para plantas y centros
     posiciones_plantas = {
         "Planta_Quito": (0, 2),
         "Planta_Guayaquil": (0, 1),
@@ -44,10 +42,8 @@ def crear_grafo_transporte(orígenes, destinos, asignacion, costos, nombres_orig
 
     posiciones = {**posiciones_plantas, **posiciones_centros, **posiciones_puntos}
 
-    # Determinar si es plantas-centros o centros-puntos
     es_distribucion = "Centro" in str(orígenes[0])
 
-    # Agregar arcos con asignaciones
     for i, origen in enumerate(orígenes):
         for j, destino in enumerate(destinos):
             if asignacion[i][j] > 0:
@@ -68,7 +64,6 @@ def crear_grafo_transporte(orígenes, destinos, asignacion, costos, nombres_orig
                         showlegend=False
                     ))
 
-    # Colores para nodos
     colores_nodo = {
         "Planta_Quito": "#4169E1",
         "Planta_Guayaquil": "#4169E1",
@@ -84,7 +79,6 @@ def crear_grafo_transporte(orígenes, destinos, asignacion, costos, nombres_orig
         "TiendaMinorista2": "#FFB84D",
     }
 
-    # Agregar nodos
     for nodo, (x, y) in posiciones.items():
         if nodo in orígenes or nodo in destinos:
             color = colores_nodo.get(nodo, "#808080")
@@ -159,7 +153,6 @@ def mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígene
 
     st.success("✅ Solución Inicial por Costo Mínimo Calculada")
 
-    # CONFIGURACIÓN DEL PROBLEMA
     st.write("---")
     st.markdown("<h2 class='section-header'>✅ Configuración del Problema</h2>",
                 unsafe_allow_html=True)
@@ -174,7 +167,6 @@ def mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígene
     with col4:
         st.metric("📊 Total Demanda", sum(demanda))
 
-    # MATRIZ DE COSTOS
     st.write("---")
     st.markdown("<h2 class='section-header'>💰 Matriz de Costos Unitarios</h2>",
                 unsafe_allow_html=True)
@@ -186,12 +178,10 @@ def mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígene
     )
     st.dataframe(costos_df, use_container_width=True)
 
-    # RESOLVER
     cm = CostoMinimo(costos, oferta, demanda)
     resultado = cm.resolver()
     pasos = cm.obtener_pasos()
 
-    # Información del método
     st.write("---")
     st.markdown("<h2 class='section-header'>📚 Método de Costo Mínimo</h2>", unsafe_allow_html=True)
     st.info("""
@@ -202,7 +192,6 @@ def mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígene
     4. Repite hasta asignar todo el flujo
     """)
 
-    # ITERACIONES
     st.write("---")
     st.markdown("<h2 class='section-header'>🔄 Iteraciones del Algoritmo</h2>",
                 unsafe_allow_html=True)
@@ -239,14 +228,12 @@ def mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígene
 
                 st.write("")
 
-                # Información adicional
                 col_info1, col_info2 = st.columns(2)
                 with col_info1:
                     st.write(f"**Oferta restante {orígenes[paso['celda'][0]]}:** {paso['oferta_restante']}")
                 with col_info2:
                     st.write(f"**Demanda restante {destinos[paso['celda'][1]]}:** {paso['demanda_restante']}")
 
-                # Matriz actual
                 st.subheader("📊 Matriz de Asignación Actual")
                 matriz_df = pd.DataFrame(
                     paso['matriz'],
@@ -255,7 +242,6 @@ def mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígene
                 )
                 st.dataframe(matriz_df, use_container_width=True)
 
-    # SOLUCIÓN FINAL
     st.write("---")
     st.markdown("<h2 class='section-header'>🏆 SOLUCIÓN INICIAL FINAL</h2>",
                 unsafe_allow_html=True)
@@ -276,7 +262,6 @@ def mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígene
     )
     st.dataframe(matriz_final_df, use_container_width=True)
 
-    # VISUALIZACIÓN GRÁFICA
     st.write("---")
     st.markdown("<h2 class='section-header'>🗺️ VISUALIZACIÓN GRÁFICA DEL TRANSPORTE</h2>",
                 unsafe_allow_html=True)
@@ -284,7 +269,6 @@ def mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígene
     fig_transporte = crear_grafo_transporte(orígenes, destinos, resultado['asignacion'], costos, orígenes, destinos)
     st.plotly_chart(fig_transporte, use_container_width=True)
 
-    # DESGLOSE DE COSTOS
     st.write("---")
     st.subheader("💹 Desglose de Costos por Ruta")
     desglose_data = []
@@ -308,7 +292,6 @@ def mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígene
     desglose_df = pd.DataFrame(desglose_data)
     st.dataframe(desglose_df, use_container_width=True, hide_index=True)
 
-    # VERIFICACIÓN
     st.write("---")
     st.subheader("✔️ Verificación de Oferta y Demanda")
 
@@ -334,7 +317,6 @@ def mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígene
     verif_df = pd.DataFrame(verif_data)
     st.dataframe(verif_df, use_container_width=True, hide_index=True)
 
-    # RESUMEN
     st.write("---")
     st.markdown("<h2 class='section-header'>📊 Resumen Ejecutivo</h2>", unsafe_allow_html=True)
 
@@ -356,6 +338,73 @@ def mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, orígene
         - Variables Básicas: {len(orígenes) + len(destinos) - 1} (esperadas)
         """)
 
+    # ==================================================
+    # 🤖 ANÁLISIS CON MÚLTIPLES IAS - AL FINAL
+    # ==================================================
+    st.write("---")
+    st.markdown("<h2 class='section-header'>📊 Análisis Comparativo con IA</h2>", unsafe_allow_html=True)
+    st.info("⏳ Generando análisis con Gemini, Hugging Face y Ollama para comparación...")
+
+    analisis_container = st.container()
+    analisis_data = {}
+
+    with st.spinner("🤖 Generando análisis con Gemini..."):
+        try:
+            analisis_data['gemini'] = generar_analisis_gemini(
+                origen="Costo Mínimo",
+                rutas=[{"destino": f"{orígenes[i]}→{destinos[j]}", "distancia": resultado['asignacion'][i][j], "ruta": f"{orígenes[i]}-{destinos[j]}"}
+                       for i in range(len(orígenes)) for j in range(len(destinos)) if resultado['asignacion'][i][j] > 0],
+                iteraciones=len(pasos),
+                total_nodos=len(orígenes) + len(destinos)
+            )
+        except Exception as e:
+            analisis_data['gemini'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("🧠 Generando análisis con Hugging Face..."):
+        try:
+            analisis_data['huggingface'] = generar_analisis_huggingface(
+                origen="Costo Mínimo",
+                rutas=[{"destino": f"{orígenes[i]}→{destinos[j]}", "distancia": resultado['asignacion'][i][j], "ruta": f"{orígenes[i]}-{destinos[j]}"}
+                       for i in range(len(orígenes)) for j in range(len(destinos)) if resultado['asignacion'][i][j] > 0],
+                iteraciones=len(pasos),
+                total_nodos=len(orígenes) + len(destinos)
+            )
+        except Exception as e:
+            analisis_data['huggingface'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("💻 Generando análisis con Ollama..."):
+        try:
+            analisis_data['ollama'] = generar_analisis_ollama(
+                origen="Costo Mínimo",
+                rutas=[{"destino": f"{orígenes[i]}→{destinos[j]}", "distancia": resultado['asignacion'][i][j], "ruta": f"{orígenes[i]}-{destinos[j]}"}
+                       for i in range(len(orígenes)) for j in range(len(destinos)) if resultado['asignacion'][i][j] > 0],
+                iteraciones=len(pasos),
+                total_nodos=len(orígenes) + len(destinos)
+            )
+        except Exception as e:
+            analisis_data['ollama'] = f"❌ Error: {str(e)}"
+
+    with analisis_container:
+        st.success("✅ Análisis Completados")
+
+        tab1, tab2, tab3 = st.tabs([
+            "🤖 Gemini",
+            "🧠 Hugging Face",
+            "💻 Ollama"
+        ])
+
+        with tab1:
+            st.markdown("### 🤖 Análisis Gemini")
+            st.write(analisis_data.get('gemini', 'Sin análisis disponible'))
+
+        with tab2:
+            st.markdown("### 🧠 Análisis Hugging Face")
+            st.write(analisis_data.get('huggingface', 'Sin análisis disponible'))
+
+        with tab3:
+            st.markdown("### 💻 Análisis Ollama")
+            st.write(analisis_data.get('ollama', 'Sin análisis disponible'))
+
     return resultado
 
 
@@ -368,29 +417,15 @@ def ejemplo_costo_minimo_transporte():
     """)
 
     if st.button("Ejecutar Ejemplo Coca-Cola", key="ej_costo_minimo_coca_cola"):
-        # Datos de Coca-Cola: Plantas a Centros
         plantas = list(PLANTAS.keys())
         centros = list(CENTROS_DISTRIBUCION.keys())
 
-        # Oferta: capacidad mensual de cada planta (en unidades de 1000 botellas para simplificar)
-        oferta = [
-            1500,  # Planta_Quito
-            1350,  # Planta_Guayaquil
-            900    # Planta_Cuenca
-        ]
-
-        # Demanda: capacidad de almacenamiento de cada centro
-        demanda = [
-            500,   # Centro_Quito
-            450,   # Centro_Guayaquil
-            250    # Centro_Cuenca
-        ]
-
-        # Matriz de costos de transporte (en miles de botellas)
+        oferta = [1500, 1350, 900]
+        demanda = [500, 450, 250]
         costos = [
-            [0.05, 0.15, 0.08],  # Desde Planta_Quito
-            [0.15, 0.05, 0.12],  # Desde Planta_Guayaquil
-            [0.08, 0.12, 0.04]   # Desde Planta_Cuenca
+            [0.05, 0.15, 0.08],
+            [0.15, 0.05, 0.12],
+            [0.08, 0.12, 0.04]
         ]
 
         mostrar_resolucion_costo_minimo_transporte(costos, oferta, demanda, plantas, centros)

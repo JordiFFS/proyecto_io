@@ -1,30 +1,19 @@
 # views/resolucion_simplex.py
-
 import streamlit as st
 import pandas as pd
 from models.programacion_lineal.simplex import Simplex
 from models.programacion_lineal.gran_m import GranM
 from models.programacion_lineal.dos_fases import DosFases
 from models.programacion_lineal.dual import Dual
-
+from gemini import generar_analisis_gemini
+from huggingface_analisis_pl import generar_analisis_huggingface
+from ollama_analisis_pl import generar_analisis_ollama, verificar_ollama_disponible
 from views.resolucion_gran_m import mostrar_resolucion_gran_m
 
 
 def mostrar_resolucion_simplex(resultado, tabla_final, nombres, A, b, signos, n_vars, n_rest, tipo_opt, metodo_usado):
     """
-    Muestra la resolución completa del Simplex con todos los pasos
-
-    Args:
-        resultado: Diccionario con los resultados del Simplex
-        tabla_final: DataFrame con la tabla final
-        nombres: Lista con nombres de variables
-        A: Matriz de coeficientes de restricciones
-        b: Vector de lado derecho
-        signos: Lista de operadores de restricciones
-        n_vars: Número de variables
-        n_rest: Número de restricciones
-        tipo_opt: Tipo de optimización (Maximizar/Minimizar)
-        metodo_usado: Nombre del método utilizado
+    Muestra la resolución completa del Simplex con todos los pasos detallados
     """
 
     estado = resultado.get('estado', 'Desconocido')
@@ -40,7 +29,6 @@ def mostrar_resolucion_simplex(resultado, tabla_final, nombres, A, b, signos, n_
     else:
         st.error("❌ Error en la resolución")
 
-    # MOSTRAR CONFIGURACIÓN DEL PROBLEMA
     st.write("---")
     st.markdown("<h2 class='section-header'>✅ Configuración del Problema</h2>", unsafe_allow_html=True)
 
@@ -61,9 +49,23 @@ def mostrar_resolucion_simplex(resultado, tabla_final, nombres, A, b, signos, n_
     st.info(
         "Esta es la tabla inicial del método Simplex. Las variables en la base inicial son las variables de holgura.")
     if 'historial_tablas' in resultado and len(resultado['historial_tablas']) > 0:
-        st.dataframe(resultado['historial_tablas'][0]['tabla'], use_container_width=True)
+        tabla_inicial = resultado['historial_tablas'][0]['tabla']
+        st.dataframe(tabla_inicial, use_container_width=True)
 
-    # DETALLES DE CADA ITERACIÓN
+    # INFORMACIÓN DEL MÉTODO
+    st.write("---")
+    st.markdown("<h2 class='section-header'>📚 Información del Método Simplex</h2>", unsafe_allow_html=True)
+    st.info("""
+    **Algoritmo del Método Simplex:**
+    1. Construir tabla inicial con variables de holgura
+    2. Verificar optimalidad: si todos los costos reducidos ≥ 0, solución óptima
+    3. Si no es óptima, seleccionar variable que entra (coeficiente más negativo)
+    4. Seleccionar variable que sale (razón mínima)
+    5. Pivotear: operaciones de fila para cambiar base
+    6. Repetir hasta optimalidad
+    """)
+
+    # ITERACIONES DETALLADAS
     st.write("---")
     st.markdown("<h2 class='section-header'>🔄 Iteraciones del Método Simplex</h2>", unsafe_allow_html=True)
 
@@ -97,31 +99,129 @@ def mostrar_resolucion_simplex(resultado, tabla_final, nombres, A, b, signos, n_
 
                     st.write("")
 
-                    # TABLA ANTERIOR
-                    st.subheader("📊 Tabla ANTES del Pivoteo")
+                    # PASO 1: ANÁLISIS DE OPTIMALIDAD Y SELECCIÓN DE VARIABLE QUE ENTRA
+                    st.subheader("1️⃣ Selección de Variable que Entra (Regla de Dantzig)")
+
+                    # Obtener detalles de selección de pivote del historial de pasos
+                    pasos_relevantes = [p for p in resultado['historial_pasos']
+                                        if p.get('iteracion') == iter_num and p.get('tipo') == 'seleccion_pivote']
+
+                    if pasos_relevantes:
+                        paso = pasos_relevantes[0]
+                        contenido = paso.get('contenido', {})
+
+                        st.write("**Fila de Costos Reducidos (última fila de la tabla anterior):**")
+                        fila_costo = contenido.get('fila_costo', {})
+
+                        costos_df_data = []
+                        for var_name, valor in fila_costo.items():
+                            costos_df_data.append({
+                                'Variable': var_name,
+                                'Costo Reducido': f"{valor:.6f}",
+                                'Estado': '❌ Negativo (entra)' if valor < -1e-10 else '✓ No negativo'
+                            })
+
+                        costos_df = pd.DataFrame(costos_df_data)
+                        st.dataframe(costos_df, use_container_width=True, hide_index=True)
+
+                        st.write(f"**Variable Seleccionada:** {contenido.get('variable_entra', 'N/A')}")
+                        st.write(f"**Razón:** Coeficiente más negativo = {contenido.get('coeficiente_costo', 0):.6f}")
+
+                    # PASO 2: CÁLCULO DE RAZONES MÍNIMAS
+                    st.subheader("2️⃣ Cálculo de Razones Mínimas (Método de Razones)")
+
+                    pasos_razon = [p for p in resultado['historial_pasos']
+                                   if p.get('iteracion') == iter_num and p.get('tipo') == 'seleccion_pivote']
+
+                    if pasos_razon:
+                        paso = pasos_razon[0]
+                        razones = paso.get('contenido', {}).get('razones_minimas', [])
+
+                        if razones:
+                            st.write("**Cálculo de razones para cada fila:**")
+                            razones_df_data = []
+                            for raz in razones:
+                                razones_df_data.append({
+                                    'Fila': raz.get('fila', 0) + 1,
+                                    'Var. Básica': raz.get('variable_basica', 'N/A'),
+                                    'b_i': f"{raz.get('b_i', 0):.6f}",
+                                    'a_ij': f"{raz.get('a_ij', 0):.6f}",
+                                    'Razón (b_i/a_ij)': f"{raz.get('razon', 0):.6f}",
+                                    'Mínima': '🔴 SÍ' if raz.get('es_minima', False) else ''
+                                })
+
+                            razones_df = pd.DataFrame(razones_df_data)
+                            st.dataframe(razones_df, use_container_width=True, hide_index=True)
+
+                            st.write(f"**Variable que Sale:** {paso.get('contenido', {}).get('variable_sale', 'N/A')}")
+                            st.write(f"**Razón:** Razón mínima entre todas las filas")
+
+                    # TABLA ANTES DEL PIVOTEO
+                    st.write("")
+                    st.subheader("3️⃣ Tabla ANTES del Pivoteo")
                     if iter_num > 1:
                         tabla_anterior = resultado['historial_tablas'][iter_num - 1]['tabla']
                     else:
                         tabla_anterior = resultado['historial_tablas'][0]['tabla']
                     st.dataframe(tabla_anterior, use_container_width=True)
 
-                    # TABLA DESPUÉS
-                    st.subheader("📊 Tabla DESPUÉS del Pivoteo")
+                    # OPERACIONES DE PIVOTEO
+                    st.write("")
+                    st.subheader("4️⃣ Operaciones de Pivoteo (Eliminación Gaussiana)")
+
+                    pasos_pivoteo = [p for p in resultado['historial_pasos']
+                                     if p.get('numero') == iter_num and p.get('tipo') == 'pivoteo']
+
+                    if pasos_pivoteo:
+                        paso = pasos_pivoteo[0]
+                        contenido = paso.get('contenido', {})
+
+                        st.write(f"**Posición del Pivote:** {contenido.get('posicion_pivote', 'N/A')}")
+                        st.write(f"**Elemento Pivote:** {contenido.get('elemento_pivote', 'N/A'):.6f}")
+
+                        pasos_calculo = contenido.get('pasos_calculo', [])
+
+                        if pasos_calculo:
+                            with st.expander("📖 Ver detalles de cálculos de pivoteo", expanded=False):
+                                for i, paso_calc in enumerate(pasos_calculo, 1):
+                                    st.markdown(f"**Paso {i}: {paso_calc.get('paso', 'N/A')}**")
+                                    st.write(f"Descripción: {paso_calc.get('descripcion', 'N/A')}")
+
+                                    tabla_estado = paso_calc.get('tabla_estado')
+                                    if tabla_estado is not None:
+                                        tabla_df = pd.DataFrame(tabla_estado)
+                                        st.write("Tabla después de este paso:")
+                                        st.dataframe(tabla_df, use_container_width=True)
+
+                    # TABLA DESPUÉS DEL PIVOTEO
+                    st.write("")
+                    st.subheader("5️⃣ Tabla DESPUÉS del Pivoteo")
                     st.dataframe(iter_info['tabla'], use_container_width=True)
 
-                    # INFORMACIÓN ADICIONAL
-                    st.subheader("📈 Información de la Iteración")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write(f"**Posición del Pivote:** {iter_info.get('posicion_pivote', 'N/A')}")
-                    with col2:
-                        if 'historial_pasos' in resultado and len(resultado['historial_pasos']) > iter_num:
-                            paso = resultado['historial_pasos'][iter_num]
-                            if 'contenido' in paso and 'valor_z_actual' in paso['contenido']:
-                                st.metric("Valor Z Actual", f"{paso['contenido']['valor_z_actual']:.6f}")
+                    # INFORMACIÓN DE LA ITERACIÓN
+                    st.write("")
+                    st.subheader("📈 Resumen de la Iteración")
+
+                    pasos_pivoteo = [p for p in resultado['historial_pasos']
+                                     if p.get('numero') == iter_num and p.get('tipo') == 'pivoteo']
+
+                    if pasos_pivoteo:
+                        paso = pasos_pivoteo[0]
+                        contenido = paso.get('contenido', {})
+
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**Variable Entra:** {contenido.get('variable_entra', 'N/A')}")
+                            st.write(f"**Variable Sale:** {contenido.get('variable_sale', 'N/A')}")
+                            st.write(f"**Posición Pivote:** {contenido.get('posicion_pivote', 'N/A')}")
+
+                        with col2:
+                            valor_z = contenido.get('valor_z_actual', 0)
+                            st.metric("Valor Z Actual", f"{valor_z:.6f}")
+                            st.write(f"**Base Actualizada:** {', '.join([str(b) for b in iter_info.get('base', [])])}")
 
     else:
-        st.success("✅ La solución óptima se encontró en la iteración inicial.")
+        st.success("✅ La solución óptima se encontró en la iteración inicial (tabla ya es óptima).")
 
     # SOLUCIÓN FINAL
     st.write("---")
@@ -137,7 +237,6 @@ def mostrar_resolucion_simplex(resultado, tabla_final, nombres, A, b, signos, n_
     with col4:
         st.metric("📦 Variables de Holgura", len([x for x in resultado.get('base_final', []) if x.startswith('s')]))
 
-    # VARIABLES DE DECISIÓN
     st.subheader("✅ Variables de Decisión Óptimas")
     var_data = []
     for var in nombres:
@@ -151,9 +250,8 @@ def mostrar_resolucion_simplex(resultado, tabla_final, nombres, A, b, signos, n_
     var_df = pd.DataFrame(var_data)
     st.dataframe(var_df, use_container_width=True, hide_index=True)
 
-    # VARIABLES DE HOLGURA
-    st.subheader("📦 Variables de Holgura")
     if 'solucion_holguras' in resultado:
+        st.subheader("📦 Variables de Holgura")
         holgura_data = []
         for s, valor in resultado['solucion_holguras'].items():
             holgura_data.append({
@@ -165,11 +263,9 @@ def mostrar_resolucion_simplex(resultado, tabla_final, nombres, A, b, signos, n_
         holgura_df = pd.DataFrame(holgura_data)
         st.dataframe(holgura_df, use_container_width=True, hide_index=True)
 
-    # TABLA FINAL
     st.subheader("📊 Tabla Final del Simplex")
     st.dataframe(tabla_final, use_container_width=True)
 
-    # VERIFICACIÓN DE RESTRICCIONES
     st.subheader("✔️ Verificación de Restricciones")
     st.write("Se verifica que la solución satisface todas las restricciones:")
 
@@ -197,7 +293,6 @@ def mostrar_resolucion_simplex(resultado, tabla_final, nombres, A, b, signos, n_
     verif_df = pd.DataFrame(verif)
     st.dataframe(verif_df, use_container_width=True, hide_index=True)
 
-    # RESUMEN FINAL
     st.write("---")
     st.markdown("<h2 class='section-header'>📊 Resumen Ejecutivo</h2>", unsafe_allow_html=True)
 
@@ -219,13 +314,77 @@ def mostrar_resolucion_simplex(resultado, tabla_final, nombres, A, b, signos, n_
         - Variables No Básicas: {', '.join([x for x in resultado.get('base_final', []) if x.startswith('s')])}
         """)
 
+    # ==================================================
+    # 🤖 ANÁLISIS CON MÚLTIPLES IAS - AL FINAL
+    # ==================================================
+    st.write("---")
+    st.markdown("<h2 class='section-header'>📊 Análisis Comparativo con IA</h2>", unsafe_allow_html=True)
+    st.info("⏳ Generando análisis con Gemini, Hugging Face y Ollama para comparación...")
+
+    analisis_container = st.container()
+    analisis_data = {}
+
+    with st.spinner("🤖 Generando análisis con Gemini..."):
+        try:
+            analisis_data['gemini'] = generar_analisis_gemini(
+                origen=f"Simplex {tipo_opt}",
+                rutas=[{"destino": nombres[i], "distancia": resultado['solucion_variables'].get(nombres[i], 0),
+                        "ruta": nombres[i]} for i in range(n_vars)],
+                iteraciones=resultado['iteraciones'],
+                total_nodos=n_vars + n_rest
+            )
+        except Exception as e:
+            analisis_data['gemini'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("🧠 Generando análisis con Hugging Face..."):
+        try:
+            analisis_data['huggingface'] = generar_analisis_huggingface(
+                origen=f"Simplex {tipo_opt}",
+                rutas=[{"destino": nombres[i], "distancia": resultado['solucion_variables'].get(nombres[i], 0),
+                        "ruta": nombres[i]} for i in range(n_vars)],
+                iteraciones=resultado['iteraciones'],
+                total_nodos=n_vars + n_rest
+            )
+        except Exception as e:
+            analisis_data['huggingface'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("💻 Generando análisis con Ollama..."):
+        try:
+            analisis_data['ollama'] = generar_analisis_ollama(
+                origen=f"Simplex {tipo_opt}",
+                rutas=[{"destino": nombres[i], "distancia": resultado['solucion_variables'].get(nombres[i], 0),
+                        "ruta": nombres[i]} for i in range(n_vars)],
+                iteraciones=resultado['iteraciones'],
+                total_nodos=n_vars + n_rest
+            )
+        except Exception as e:
+            analisis_data['ollama'] = f"❌ Error: {str(e)}"
+
+    with analisis_container:
+        st.success("✅ Análisis Completados")
+
+        tab1, tab2, tab3 = st.tabs([
+            "🤖 Gemini",
+            "🧠 Hugging Face",
+            "💻 Ollama"
+        ])
+
+        with tab1:
+            st.markdown("### 🤖 Análisis Gemini")
+            st.write(analisis_data.get('gemini', 'Sin análisis disponible'))
+
+        with tab2:
+            st.markdown("### 🧠 Análisis Hugging Face")
+            st.write(analisis_data.get('huggingface', 'Sin análisis disponible'))
+
+        with tab3:
+            st.markdown("### 💻 Análisis Ollama")
+            st.write(analisis_data.get('ollama', 'Sin análisis disponible'))
+
 
 def mostrar_ejemplos(metodo):
     """
     Muestra ejemplos según el método seleccionado
-
-    Args:
-        metodo: Tipo de método ('simplex', 'gran_m', 'dos_fases', 'dual')
     """
 
     if metodo == "simplex":
@@ -280,20 +439,33 @@ def mostrar_ejemplos(metodo):
 
                 st.dataframe(simplex.obtener_tabla_pandas(), use_container_width=True)
 
+                st.write("---")
+                mostrar_resolucion_simplex(
+                    resultado,
+                    simplex.obtener_tabla_pandas(),
+                    ["Coca-Cola", "Sprite", "Fanta"],
+                    A,
+                    b,
+                    signos,
+                    3,
+                    6,
+                    "Maximización",
+                    "Simplex"
+                )
 
     elif metodo == "gran_m":
         st.subheader("📊 Ejemplo: Minimización de Costos - Método Gran M")
         st.write("""
         **Problema:** Minimizar costos de distribución desde plantas a centros de distribución.
-        
+
         **Variables:**
         - x₁ = Botellas desde Planta Quito a Centro Quito
         - x₂ = Botellas desde Planta Quito a Centro Guayaquil
         - x₃ = Botellas desde Planta Guayaquil a Centro Cuenca
-        
+
         **Función Objetivo:**
         Minimizar: 0.05x₁ + 0.15x₂ + 0.12x₃
-        
+
         **Restricciones:**
         - Capacidad Planta Quito: x₁ + x₂ ≤ 1,500,000
         - Capacidad Planta Guayaquil: x₃ ≥ 400,000
@@ -302,14 +474,13 @@ def mostrar_ejemplos(metodo):
         - Demanda Centro Cuenca: x₃ ≤ 500,000
         """)
         if st.button("Ejecutar Ejemplo Gran M", key="ej_granm"):
-            # Definir los parámetros del problema
             c = [0.05, 0.15, 0.12]
             A = [
-                [1, 1, 0],  # Capacidad Planta Quito
-                [0, 0, 1],  # Capacidad Planta Guayaquil
-                [1, 0, 0],  # Demanda Centro Quito
-                [0, 1, 0],  # Demanda Centro Guayaquil
-                [0, 0, 1],  # Demanda Centro Cuenca
+                [1, 1, 0],
+                [0, 0, 1],
+                [1, 0, 0],
+                [0, 1, 0],
+                [0, 0, 1],
             ]
             b = [1500000, 400000, 300000, 200000, 500000]
             signos = ["<=", ">=", ">=", ">=", "<="]

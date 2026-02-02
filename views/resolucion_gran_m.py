@@ -1,14 +1,15 @@
-# views/resolucion_gran_m_debug.py
-
+# views/resolucion_gran_m.py
 import streamlit as st
 import pandas as pd
 from models.programacion_lineal.gran_m import GranM
+from gemini import generar_analisis_gemini
+from huggingface_analisis_pl import generar_analisis_huggingface
+from ollama_analisis_pl import generar_analisis_ollama, verificar_ollama_disponible
 
 
 def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
     """Muestra la resolución completa del Gran M con debug"""
 
-    # MOSTRAR DEBUG LOG
     if 'debug_log' in resultado and resultado['debug_log']:
         with st.expander("🔍 Ver LOG DE DEBUG (Detalle completo de la resolución)", expanded=False):
             debug_text = "\n".join(resultado['debug_log'])
@@ -28,7 +29,6 @@ def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
         st.error("❌ Error en la resolución del problema")
         return
 
-    # MOSTRAR CONFIGURACIÓN
     st.write("---")
     st.markdown("<h2 class='section-header'>✅ Configuración del Problema</h2>", unsafe_allow_html=True)
 
@@ -42,7 +42,6 @@ def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
     with col4:
         st.metric("🔄 Iteraciones", resultado['iteraciones'])
 
-    # TABLA INICIAL
     st.write("---")
     st.markdown("<h2 class='section-header'>📍 Tabla Inicial (Iteración 0)</h2>", unsafe_allow_html=True)
 
@@ -57,7 +56,6 @@ def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
     if 'historial_tablas' in resultado and len(resultado['historial_tablas']) > 0:
         st.dataframe(resultado['historial_tablas'][0]['tabla'], use_container_width=True)
 
-    # ITERACIONES
     st.write("---")
     st.markdown("<h2 class='section-header'>🔄 Iteraciones del Método Gran M</h2>", unsafe_allow_html=True)
 
@@ -91,7 +89,6 @@ def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
                     st.subheader("📊 Tabla de la Iteración")
                     st.dataframe(iter_info['tabla'], use_container_width=True)
 
-    # SOLUCIÓN FINAL
     st.write("---")
     st.markdown("<h2 class='section-header'>🏆 SOLUCIÓN ÓPTIMA FINAL</h2>", unsafe_allow_html=True)
 
@@ -105,7 +102,6 @@ def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
     with col4:
         st.metric("📦 Estado", resultado.get('estado', 'N/A'))
 
-    # VARIABLES DE DECISIÓN
     st.subheader("✅ Variables de Decisión Óptimas")
     var_data = []
     for var in nombres:
@@ -119,12 +115,10 @@ def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
     var_df = pd.DataFrame(var_data)
     st.dataframe(var_df, use_container_width=True, hide_index=True)
 
-    # TABLA FINAL
     st.subheader("📊 Tabla Final del Gran M")
     tabla_final = pd.DataFrame(resultado['tabla_final'])
     st.dataframe(tabla_final, use_container_width=True)
 
-    # RESUMEN
     st.write("---")
     st.markdown("<h2 class='section-header'>📊 Resumen Ejecutivo</h2>", unsafe_allow_html=True)
 
@@ -145,6 +139,73 @@ def mostrar_resolucion_gran_m(resultado, nombres, n_vars, n_rest, tipo_opt):
         - Variables Básicas: {', '.join([x for x in resultado.get('base_final', []) if x.startswith('x')])}
         - Estado: {resultado.get('estado', 'N/A')}
         """)
+
+    # ==================================================
+    # 🤖 ANÁLISIS CON MÚLTIPLES IAS - AL FINAL
+    # ==================================================
+    st.write("---")
+    st.markdown("<h2 class='section-header'>📊 Análisis Comparativo con IA</h2>", unsafe_allow_html=True)
+    st.info("⏳ Generando análisis con Gemini, Hugging Face y Ollama para comparación...")
+
+    analisis_container = st.container()
+    analisis_data = {}
+
+    with st.spinner("🤖 Generando análisis con Gemini..."):
+        try:
+            analisis_data['gemini'] = generar_analisis_gemini(
+                origen=f"Gran M {tipo_opt}",
+                rutas=[{"destino": nombres[i], "distancia": resultado['solucion_variables'].get(nombres[i], 0),
+                        "ruta": nombres[i]} for i in range(len(nombres))],
+                iteraciones=resultado['iteraciones'],
+                total_nodos=n_vars + n_rest
+            )
+        except Exception as e:
+            analisis_data['gemini'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("🧠 Generando análisis con Hugging Face..."):
+        try:
+            analisis_data['huggingface'] = generar_analisis_huggingface(
+                origen=f"Gran M {tipo_opt}",
+                rutas=[{"destino": nombres[i], "distancia": resultado['solucion_variables'].get(nombres[i], 0),
+                        "ruta": nombres[i]} for i in range(len(nombres))],
+                iteraciones=resultado['iteraciones'],
+                total_nodos=n_vars + n_rest
+            )
+        except Exception as e:
+            analisis_data['huggingface'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("💻 Generando análisis con Ollama..."):
+        try:
+            analisis_data['ollama'] = generar_analisis_ollama(
+                origen=f"Gran M {tipo_opt}",
+                rutas=[{"destino": nombres[i], "distancia": resultado['solucion_variables'].get(nombres[i], 0),
+                        "ruta": nombres[i]} for i in range(len(nombres))],
+                iteraciones=resultado['iteraciones'],
+                total_nodos=n_vars + n_rest
+            )
+        except Exception as e:
+            analisis_data['ollama'] = f"❌ Error: {str(e)}"
+
+    with analisis_container:
+        st.success("✅ Análisis Completados")
+
+        tab1, tab2, tab3 = st.tabs([
+            "🤖 Gemini",
+            "🧠 Hugging Face",
+            "💻 Ollama"
+        ])
+
+        with tab1:
+            st.markdown("### 🤖 Análisis Gemini")
+            st.write(analisis_data.get('gemini', 'Sin análisis disponible'))
+
+        with tab2:
+            st.markdown("### 🧠 Análisis Hugging Face")
+            st.write(analisis_data.get('huggingface', 'Sin análisis disponible'))
+
+        with tab3:
+            st.markdown("### 💻 Análisis Ollama")
+            st.write(analisis_data.get('ollama', 'Sin análisis disponible'))
 
 
 def ejemplo_gran_m_coca_cola():

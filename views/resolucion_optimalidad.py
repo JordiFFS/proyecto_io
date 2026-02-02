@@ -1,13 +1,12 @@
-"""
-views/resolucion_optimalidad.py
-Vista para Método de Optimalidad (MODI + Stepping Stone) adaptada a Coca-Cola
-"""
-
+# views/resolucion_optimalidad.py
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from models.transporte.optimalidad import OptimizadorTransporte
+from gemini import generar_analisis_gemini
+from huggingface_analisis_pl import generar_analisis_huggingface
+from ollama_analisis_pl import generar_analisis_ollama, verificar_ollama_disponible
 from empresa.datos_empresa import (
     PLANTAS, CENTROS_DISTRIBUCION, COSTOS_TRANSPORTE_DISTRIBUCION,
     PUNTOS_VENTA, COSTOS_TRANSPORTE_VENTA
@@ -20,7 +19,6 @@ def crear_grafo_transporte_optimalidad(orígenes, destinos, asignacion, costos):
     """
     fig = go.Figure()
 
-    # Posiciones para plantas y centros
     posiciones_plantas = {
         "Planta_Quito": (0, 2),
         "Planta_Guayaquil": (0, 1),
@@ -44,7 +42,6 @@ def crear_grafo_transporte_optimalidad(orígenes, destinos, asignacion, costos):
 
     posiciones = {**posiciones_plantas, **posiciones_centros, **posiciones_puntos}
 
-    # Agregar arcos con asignaciones
     for i, origen in enumerate(orígenes):
         for j, destino in enumerate(destinos):
             if asignacion[i][j] > 0:
@@ -65,7 +62,6 @@ def crear_grafo_transporte_optimalidad(orígenes, destinos, asignacion, costos):
                         showlegend=False
                     ))
 
-    # Colores para nodos
     colores_nodo = {
         "Planta_Quito": "#4169E1",
         "Planta_Guayaquil": "#4169E1",
@@ -81,7 +77,6 @@ def crear_grafo_transporte_optimalidad(orígenes, destinos, asignacion, costos):
         "TiendaMinorista2": "#FFB84D",
     }
 
-    # Agregar nodos
     for nodo, (x, y) in posiciones.items():
         if nodo in orígenes or nodo in destinos:
             color = colores_nodo.get(nodo, "#808080")
@@ -157,7 +152,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
 
     st.success("✅ Optimización de Solución Iniciada (MODI + Stepping Stone)")
 
-    # INFORMACIÓN DEL MÉTODO
     st.write("---")
     st.markdown("<h2 class='section-header'>📚 Información del Método MODI</h2>",
                 unsafe_allow_html=True)
@@ -171,7 +165,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
     5. Repite hasta que todos los Δ_ij ≥ 0 (solución óptima)
     """)
 
-    # SOLUCIÓN INICIAL
     st.write("---")
     st.markdown(f"<h2 class='section-header'>🔍 Solución Inicial (Método: {nombre_metodo})</h2>",
                 unsafe_allow_html=True)
@@ -183,7 +176,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
     )
     st.dataframe(solucion_inicial_df, use_container_width=True)
 
-    # Costo inicial
     costo_inicial = 0
     for i in range(len(orígenes)):
         for j in range(len(destinos)):
@@ -191,7 +183,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
 
     st.metric("💰 Costo Inicial", f"${costo_inicial:.2f}")
 
-    # RESOLVER
     try:
         optimizador = OptimizadorTransporte(costos, solucion_inicial)
         resultado = optimizador.resolver()
@@ -200,13 +191,11 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
         st.error(f"Error durante la optimización: {str(e)}")
         return
 
-    # ITERACIONES DE OPTIMIZACIÓN
     st.write("---")
     st.markdown("<h2 class='section-header'>🔄 Proceso de Optimización (MODI)</h2>",
                 unsafe_allow_html=True)
 
     if pasos:
-        # Filtrar pasos (excluir el final de óptimo)
         pasos_iteracion = [p for p in pasos if p.get('status') != 'optimo' and p.get('status') != 'error']
 
         if pasos_iteracion:
@@ -221,7 +210,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
                         f"<div class='iteration-header'><h3>Iteración {paso['iteracion']}: Búsqueda de Mejora</h3></div>",
                         unsafe_allow_html=True)
 
-                    # Potenciales
                     st.subheader("1️⃣ Cálculo de Potenciales (u, v)")
 
                     col_pot1, col_pot2 = st.columns(2)
@@ -235,7 +223,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
                     with st.expander("📖 Ver proceso de cálculo"):
                         st.markdown(paso['explicacion_potenciales'])
 
-                    # Costos marginales
                     st.subheader("2️⃣ Evaluación de Costos Marginales")
                     st.markdown(paso['seleccion'])
 
@@ -243,7 +230,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
                         for exp in paso['marginales']:
                             st.text(exp)
 
-                    # Ciclo y Theta
                     if paso.get('ciclo'):
                         st.subheader("3️⃣ Ciclo Cerrado (Stepping Stone)")
                         st.write(f"**Ciclo encontrado:** {paso['ciclo']}")
@@ -254,7 +240,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
                         st.subheader("5️⃣ Ajuste de la Solución")
                         st.markdown(paso['explicacion_ajuste'])
 
-                    # Matriz después de la iteración
                     st.subheader("📊 Matriz Después de Ajuste")
                     matriz_df = pd.DataFrame(
                         paso['matriz'],
@@ -263,12 +248,10 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
                     )
                     st.dataframe(matriz_df, use_container_width=True)
 
-    # SOLUCIÓN ÓPTIMA
     st.write("---")
     st.markdown("<h2 class='section-header'>🏆 SOLUCIÓN ÓPTIMA ENCONTRADA</h2>",
                 unsafe_allow_html=True)
 
-    # Buscar paso óptimo
     paso_optimo = None
     for p in pasos:
         if p.get('status') == 'optimo':
@@ -292,7 +275,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
         with col4:
             st.metric("🔄 Iteraciones", paso_optimo['iteracion'])
 
-        # Matriz óptima
         st.subheader("✅ Matriz Óptima Final")
         matriz_optima_df = pd.DataFrame(
             resultado,
@@ -301,7 +283,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
         )
         st.dataframe(matriz_optima_df, use_container_width=True)
 
-        # VISUALIZACIÓN GRÁFICA
         st.write("---")
         st.markdown("<h2 class='section-header'>🗺️ VISUALIZACIÓN GRÁFICA DE LA SOLUCIÓN ÓPTIMA</h2>",
                     unsafe_allow_html=True)
@@ -309,7 +290,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
         fig_transporte = crear_grafo_transporte_optimalidad(orígenes, destinos, resultado, costos)
         st.plotly_chart(fig_transporte, use_container_width=True)
 
-        # Desglose de costos
         st.write("---")
         st.subheader("💹 Desglose de Costos Óptimos")
         desglose_data = []
@@ -332,11 +312,9 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
             desglose_df = pd.DataFrame(desglose_data)
             st.dataframe(desglose_df, use_container_width=True, hide_index=True)
 
-        # Verificación
         st.write("---")
         st.subheader("✔️ Verificación de Oferta y Demanda")
 
-        # Recalcular oferta y demanda originales
         oferta_original = [1500, 1350, 900] if len(orígenes) == 3 else oferta
         demanda_original = [500, 450, 250] if len(destinos) == 3 else demanda
 
@@ -362,7 +340,6 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
         verif_df = pd.DataFrame(verif_data)
         st.dataframe(verif_df, use_container_width=True, hide_index=True)
 
-    # RESUMEN
     st.write("---")
     st.markdown("<h2 class='section-header'>📊 Resumen Ejecutivo</h2>", unsafe_allow_html=True)
 
@@ -391,6 +368,73 @@ def mostrar_resolucion_optimalidad(costos, oferta, demanda, solucion_inicial, no
         st.write(f"- % Mejora: {porcentaje_mejora:.2f}%")
         st.write("- Status: ✅ Óptimo")
 
+    # ==================================================
+    # 🤖 ANÁLISIS CON MÚLTIPLES IAS - AL FINAL
+    # ==================================================
+    st.write("---")
+    st.markdown("<h2 class='section-header'>📊 Análisis Comparativo con IA</h2>", unsafe_allow_html=True)
+    st.info("⏳ Generando análisis con Gemini, Hugging Face y Ollama para comparación...")
+
+    analisis_container = st.container()
+    analisis_data = {}
+
+    with st.spinner("🤖 Generando análisis con Gemini..."):
+        try:
+            analisis_data['gemini'] = generar_analisis_gemini(
+                origen="MODI - Optimalidad",
+                rutas=[{"destino": f"{orígenes[i]}→{destinos[j]}", "distancia": resultado[i][j], "ruta": f"{orígenes[i]}-{destinos[j]}"}
+                       for i in range(len(orígenes)) for j in range(len(destinos)) if resultado[i][j] > 0],
+                iteraciones=iteraciones,
+                total_nodos=len(orígenes) + len(destinos)
+            )
+        except Exception as e:
+            analisis_data['gemini'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("🧠 Generando análisis con Hugging Face..."):
+        try:
+            analisis_data['huggingface'] = generar_analisis_huggingface(
+                origen="MODI - Optimalidad",
+                rutas=[{"destino": f"{orígenes[i]}→{destinos[j]}", "distancia": resultado[i][j], "ruta": f"{orígenes[i]}-{destinos[j]}"}
+                       for i in range(len(orígenes)) for j in range(len(destinos)) if resultado[i][j] > 0],
+                iteraciones=iteraciones,
+                total_nodos=len(orígenes) + len(destinos)
+            )
+        except Exception as e:
+            analisis_data['huggingface'] = f"❌ Error: {str(e)}"
+
+    with st.spinner("💻 Generando análisis con Ollama..."):
+        try:
+            analisis_data['ollama'] = generar_analisis_ollama(
+                origen="MODI - Optimalidad",
+                rutas=[{"destino": f"{orígenes[i]}→{destinos[j]}", "distancia": resultado[i][j], "ruta": f"{orígenes[i]}-{destinos[j]}"}
+                       for i in range(len(orígenes)) for j in range(len(destinos)) if resultado[i][j] > 0],
+                iteraciones=iteraciones,
+                total_nodos=len(orígenes) + len(destinos)
+            )
+        except Exception as e:
+            analisis_data['ollama'] = f"❌ Error: {str(e)}"
+
+    with analisis_container:
+        st.success("✅ Análisis Completados")
+
+        tab1, tab2, tab3 = st.tabs([
+            "🤖 Gemini",
+            "🧠 Hugging Face",
+            "💻 Ollama"
+        ])
+
+        with tab1:
+            st.markdown("### 🤖 Análisis Gemini")
+            st.write(analisis_data.get('gemini', 'Sin análisis disponible'))
+
+        with tab2:
+            st.markdown("### 🧠 Análisis Hugging Face")
+            st.write(analisis_data.get('huggingface', 'Sin análisis disponible'))
+
+        with tab3:
+            st.markdown("### 💻 Análisis Ollama")
+            st.write(analisis_data.get('ollama', 'Sin análisis disponible'))
+
     return resultado
 
 
@@ -403,24 +447,17 @@ def ejemplo_optimalidad_transporte():
     """)
 
     if st.button("Ejecutar Ejemplo Coca-Cola", key="ej_optimalidad_coca_cola"):
-        # Datos de Coca-Cola: Plantas a Centros
         plantas = list(PLANTAS.keys())
         centros = list(CENTROS_DISTRIBUCION.keys())
 
-        # Oferta: capacidad mensual
         oferta = [1500, 1350, 900]
-
-        # Demanda: capacidad de almacenamiento
         demanda = [500, 450, 250]
-
-        # Matriz de costos
         costos = [
             [0.05, 0.15, 0.08],
             [0.15, 0.05, 0.12],
             [0.08, 0.12, 0.04]
         ]
 
-        # Generar solución inicial usando Vogel
         from models.transporte.vogel import MetodoVogel
         vogel = MetodoVogel(costos, oferta, demanda)
         solucion_inicial = vogel.resolver()
