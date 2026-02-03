@@ -225,7 +225,7 @@ def ejemplo_gran_m_coca_cola():
 
     **Restricciones:**
     - x₁ + x₂ ≤ 1,500,000 (Capacidad Planta Quito)
-    - x₃ ≥ 400,000 (Demanda mínima Centro Cuenca)
+    - x₃ ≥ 0 (Demanda mínima Centro Cuenca)
     - x₁ ≥ 300,000 (Demanda mínima Centro Quito)
     - x₂ ≥ 200,000 (Demanda mínima Centro Guayaquil)
     - x₃ ≤ 500,000 (Capacidad máxima Centro Cuenca)
@@ -241,7 +241,7 @@ def ejemplo_gran_m_coca_cola():
             [0, 0, 1],
         ]
 
-        b = [1500000, 400000, 300000, 200000, 500000]
+        b = [1500000, 0, 300000, 200000, 500000]
         signos = ["<=", ">=", ">=", ">=", "<="]
 
         gran_m = GranM(

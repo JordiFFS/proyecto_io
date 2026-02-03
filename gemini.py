@@ -1,21 +1,12 @@
-"""
-Archivo: gemini_pruebas.py
-Integrado en resolucion_ruta_mas_corta.py
-Genera un análisis académico usando Gemini (Google)
-"""
-
-import google.generativeai as genai
+#import google.generativeai as genai
 import os
 
-# ======================================================
-# 🔑 CONFIGURACIÓN DEL TOKEN DE GEMINI
-# ======================================================
 def configurar_gemini():
     """Configura Gemini con la API key"""
     api_key = "AIzaSyCgqQn0Ok2n91mHooDByTUHbgnM8M2LuEg"
     if not api_key:
         raise ValueError("GEMINI_API_KEY no está configurada en variables de entorno")
-    genai.configure(api_key=api_key)
+    #genai.configure(api_key=api_key)
 
 try:
     configurar_gemini()
@@ -23,7 +14,8 @@ except ValueError as e:
     print(f"⚠️ Advertencia: {e}")
 
 MODEL_NAME = "gemini-2.0-flash"
-model = genai.GenerativeModel(MODEL_NAME)
+model = (MODEL_NAME)
+#model = genai.GenerativeModel(MODEL_NAME)
 
 
 def generar_analisis_gemini(origen, rutas, iteraciones, total_nodos) -> str:

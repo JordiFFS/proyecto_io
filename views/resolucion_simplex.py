@@ -404,9 +404,9 @@ def mostrar_ejemplos(metodo):
         - Capacidad Planta Quito: x₁ + x₂ + x₃ ≤ 1,500,000
         - Capacidad Planta Guayaquil: x₁ + x₂ + x₃ ≤ 1,350,000
         - Capacidad Planta Cuenca: x₁ + x₂ + x₃ ≤ 900,000
-        - Demanda Coca-Cola: x₁ ≥ 450,000
-        - Demanda Sprite: x₂ ≥ 300,000
-        - Demanda Fanta: x₃ ≥ 360,000
+        - Demanda Coca-Cola: x₁ ≤ 450,000
+        - Demanda Sprite: x₂ ≤ 300,000
+        - Demanda Fanta: x₃ ≤ 360,000
         """)
 
         if st.button("Ejecutar", key="ej_simplex"):
@@ -468,7 +468,7 @@ def mostrar_ejemplos(metodo):
 
         **Restricciones:**
         - Capacidad Planta Quito: x₁ + x₂ ≤ 1,500,000
-        - Capacidad Planta Guayaquil: x₃ ≥ 400,000
+        - Capacidad Planta Guayaquil: x₃ ≥ 0
         - Demanda Centro Quito: x₁ ≥ 300,000
         - Demanda Centro Guayaquil: x₂ ≥ 200,000
         - Demanda Centro Cuenca: x₃ ≤ 500,000
@@ -482,7 +482,7 @@ def mostrar_ejemplos(metodo):
                 [0, 1, 0],
                 [0, 0, 1],
             ]
-            b = [1500000, 400000, 300000, 200000, 500000]
+            b = [1500000, 0, 300000, 200000, 500000]
             signos = ["<=", ">=", ">=", ">=", "<="]
             gran_m = GranM(
                 c, A, b, signos,
